@@ -56,6 +56,8 @@ python3 -m pytest -q tests
 
 Nástroje: `tools/dmx_test.py` (test kanálov), `tools/audio_meter.py` (BPM a pásma v termináli).
 
+**Virtuálne svetlá:** `http://localhost:8080/viz.html` (alebo 👁 Viz v ovládaní) kreslí PartyBar4, moving head aj Belku priamo z DMX rámca, ktorý by išiel do svetiel. Dole je panel všetkých 32 kanálov. Funguje aj s `--dry`, takže efekty sa dajú ladiť bez svetiel.
+
 ### Test so svetlami na Macu (pred nasadením na Pi)
 
 Rovnaký kód beží aj na Macu: hudba z Macu ide cez **BlackHole 2ch**, DMX cez Lixada dongle.

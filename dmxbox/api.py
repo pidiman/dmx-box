@@ -72,6 +72,13 @@ def create_app(box) -> FastAPI:
     def get_dmx():
         return {"channels": list(box.out.last)}
 
+    @app.get("/api/fixtures")
+    def get_fixtures():
+        """Kanálové mapy pre virtuálne svetlá (web/viz.html)."""
+        return {k: {"name": f.name, "start": f.start, "channels": f.channels,
+                    "ranges": f.ranges, "values": f.values}
+                for k, f in box.engine.rig.fx.items()}
+
     @app.post("/api/settings")
     def patch_settings(body: Patch):
         data = body.model_dump()
@@ -144,6 +151,19 @@ def create_app(box) -> FastAPI:
             while True:
                 await sock.send_json(snapshot())
                 await asyncio.sleep(0.05)   # 20× za sekundu
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+
+    @app.websocket("/ws/dmx")
+    async def ws_dmx(sock: WebSocket):
+        """DMX rámec tak, ako ide do svetiel (aj s light delay), ~30× za sekundu."""
+        await sock.accept()
+        try:
+            while True:
+                a = box.analyzer.snapshot()
+                await sock.send_json({"ch": list(box.out.last), "bpm": round(a.bpm, 1),
+                                      "silent": a.silent})
+                await asyncio.sleep(0.033)
         except (WebSocketDisconnect, RuntimeError):
             pass
 

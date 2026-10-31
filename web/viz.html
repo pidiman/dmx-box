@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000">
+  <title>Virtuálne svetlá</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; color: #ddd; overflow: hidden;
+      font: 13px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .hud { position: fixed; top: 10px; left: 12px; right: 12px; display: flex; gap: 8px; align-items: center;
+      pointer-events: none; }
+    .hud > * { pointer-events: auto; }
+    .pill { background: rgba(20, 20, 32, .8); border: 1px solid #2a2a40; border-radius: 999px; padding: 4px 10px; }
+    .pill.off { color: #ff6b6b; }
+    a.pill, button.pill { color: #ddd; text-decoration: none; font: inherit; cursor: pointer; }
+    .grow { flex: 1; }
+    #dmx { position: fixed; left: 0; right: 0; bottom: 0; display: grid;
+      grid-template-columns: repeat(32, 1fr); gap: 2px; padding: 8px 10px 10px;
+      background: rgba(8, 8, 14, .88); border-top: 1px solid #222; }
+    #dmx.hidden { display: none; }
+    .c { display: grid; grid-template-rows: 46px auto auto; gap: 2px; text-align: center; min-width: 0; }
+    .c .bar { position: relative; background: #15151f; border-radius: 3px; overflow: hidden; }
+    .c .bar i { position: absolute; left: 0; right: 0; bottom: 0; background: #29d3ff; }
+    .c.parbar .bar i { background: #ff2e7e; }
+    .c.belka .bar i { background: #ffb020; }
+    .c b { font-weight: 600; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .c small { font-size: 9px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 700px) {
+      #dmx { grid-template-columns: repeat(16, 1fr); }
+      .c { grid-template-rows: 30px auto auto; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <span id="conn" class="pill off">offline</span>
+    <span id="bpm" class="pill">--- BPM</span>
+    <span class="grow"></span>
+    <button id="toggle" class="pill">DMX kanály</button>
+    <a class="pill" href="/" target="_blank">Ovládanie</a>
+  </div>
+  <div id="dmx"></div>
+  <script src="viz.js"></script>
+</body>
+</html>
