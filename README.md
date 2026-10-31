@@ -57,6 +57,8 @@ python3 -m pytest -q tests
 
 Nástroje: `tools/dmx_test.py` (test kanálov), `tools/audio_meter.py` (BPM a pásma v termináli).
 
+**Štýl hudby:** v auto móde box sám rozpozná žáner (DnB, techno, house, hip-hop, chill, pop) a fázu skladby (breakdown, build, drop) a podľa toho mení farby, pohyb, laser, strobo aj dym. V UI sa dá štýl aj pevne zvoliť. Test bez hudby: `python3 -m dmxbox.main --genre mix --dry --port 8080` (žánre sa striedajú po 60 s). Popis: [PROJEKT.md → Štýl hudby](docs/PROJEKT.md#štýl-hudby-auto-rozpoznanie-alebo-pevne).
+
 **Virtuálne svetlá:** `http://localhost:8080/viz.html` (alebo 👁 Viz v ovládaní) kreslí PartyBar4, moving head aj Belku priamo z DMX rámca, ktorý by išiel do svetiel. Dole je panel všetkých 36 kanálov, vrátane dymostroja. Funguje aj s `--dry`, takže efekty sa dajú ladiť bez svetiel.
 
 ### Test so svetlami na Macu (pred nasadením na Pi)
@@ -77,6 +79,6 @@ python3 -m dmxbox.main --input "BlackHole 2ch" --port 8080
 
 ## Stav
 
-Kód v0.1: audio analýza, engine s 8 + 8 FX, auto mód, dym, presety, PWA, virtuálne svetlá, systemd a inštalácia. Otestované bez hardvéru (simulácia, 15 testov). Ďalší krok: M0–M3 na Pi so svetlami.
+Kód v0.2: audio analýza, rozpoznanie štýlu hudby a fázy skladby, engine s 8 + 8 FX a 6 štýlmi, dym, presety, PWA, virtuálne svetlá, systemd a inštalácia. Otestované bez hardvéru (simulácia, 26 testov). Ďalší krok: M0–M3 na Pi so svetlami.
 
 Plán a odložené funkcie (správa svetiel z UI): [docs/ROADMAP.md](docs/ROADMAP.md).

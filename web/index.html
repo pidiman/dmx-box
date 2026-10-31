@@ -49,6 +49,12 @@
       <button id="bpm-auto" title="Späť na automatické BPM">A</button>
     </section>
 
+    <section class="style">
+      <h2>Štýl hudby <em id="style-now"></em></h2>
+      <div class="styles" id="styles"></div>
+      <div class="style-info"><span id="style-detect">rozpoznávam…</span><span id="section" class="pill">—</span></div>
+    </section>
+
     <section class="hold">
       <button id="strobe" class="big strobe">STROBO</button>
       <button id="fog" class="big fogbtn">DYM<small id="fog-info"></small></button>
@@ -67,7 +73,7 @@
 
     <section>
       <h2>Paleta</h2>
-      <div class="chips" id="palettes"></div>
+      <div class="chips" id="palettes"><button class="chip" id="pal-style" data-p="__style"><span class="sw"><i style="background:linear-gradient(90deg,#f00,#f0f,#00f,#0f0)"></i></span><b>podľa štýlu</b></button></div>
       <div class="row manual">
         <label class="picker">Vlastná farba <input type="color" id="manual" value="#ff0040"></label>
         <button id="manual-off">Zrušiť</button>

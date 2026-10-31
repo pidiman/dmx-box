@@ -109,3 +109,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
   .wheel { max-width: 320px; }
   .wheel button { font-size: 11px; }
 }
+
+.styles { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.styles button { padding: 10px 2px; font-size: 13px; }
+.styles button.on { background: var(--accent2); color: #001018; border-color: var(--accent2); }
+.styles button[data-style=auto].on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.style-info { display: flex; justify-content: space-between; align-items: center; margin-top: 8px;
+  color: var(--muted); font-size: 13px; }
+.pill.sec-breakdown { background: #1a2340; color: #9bb4ff; }
+.pill.sec-build { background: #3a2a08; color: #ffc65a; }
+.pill.sec-drop { background: #ff2d6f; color: #fff; }
+@media (max-width: 520px) { .styles { grid-template-columns: repeat(4, 1fr); } }

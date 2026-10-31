@@ -19,7 +19,7 @@ from .config import load_config, resolve
 from .dmx_out import DMXOut
 from .engine import Engine
 from .fixtures import load_rig
-from .sim import synth_source
+from .sim import GENRES, mix_source, synth_source
 from .state import Settings, Store
 
 
@@ -33,10 +33,16 @@ class Box:
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
-          input_device: str | None = None) -> Box:
+          input_device: str | None = None, genre: str | None = None) -> Box:
     ac, dc = cfg["audio"], cfg["dmx"]
     rig = load_rig(cfg["fixtures_file"])
-    if sim_bpm:
+    simulated = bool(sim_bpm or genre)
+    if genre == "mix":
+        source = mix_source(rate=ac["rate"], hop=ac["hop"])
+    elif genre:
+        source = synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], genre=genre,
+                              breakdown=None)
+    elif sim_bpm:
         source = synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], silence_every=60)
     elif input_device:
         source = device_source(input_device, ac["rate"], ac["hop"])
@@ -44,7 +50,7 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
         source = parec_source(ac["source"], ac["rate"], ac["hop"])
     analyzer = Analyzer(source, rate=ac["rate"], hop=ac["hop"], fft=ac["fft"],
                         bpm_min=ac["bpm_min"], bpm_max=ac["bpm_max"],
-                        silence_seconds=ac["silence_seconds"], realtime=bool(sim_bpm))
+                        silence_seconds=ac["silence_seconds"], realtime=simulated)
     out = DMXOut(driver="dry" if dry else dc["driver"], fps=dc["fps"],
                  channels=min(dc["channels"], rig.universe_channels) or dc["channels"],
                  chunk=dc["chunk"], delay_ms=cfg["output"]["light_delay_ms"])
@@ -59,6 +65,8 @@ def main() -> None:
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--sim", type=float, nargs="?", const=124.0, default=None,
                     metavar="BPM", help="simulovaná hudba (predvolene 124 BPM)")
+    ap.add_argument("--genre", choices=("mix",) + GENRES, default=None,
+                    help="simulovaný žáner; mix = striedanie žánrov s breakdown/drop (test auto štýlu)")
     ap.add_argument("--dry", action="store_true", help="DMX naprázdno (bez USB)")
     ap.add_argument("--input", default=None, metavar="ZARIADENIE",
                     help="zvukový vstup cez sounddevice (Mac/PC), napr. 'BlackHole 2ch'")
@@ -73,7 +81,7 @@ def main() -> None:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
-    box = build(cfg, sim_bpm=args.sim, dry=args.dry, input_device=args.input)
+    box = build(cfg, sim_bpm=args.sim, dry=args.dry, input_device=args.input, genre=args.genre)
     box.out.start()
     box.analyzer.start()
     box.engine.start()

@@ -43,10 +43,14 @@ class FogController:
         self._start = None
 
     def update(self, now: float, a: AudioState, hold: bool, auto: bool,
-               burst_s: float, blackout: bool) -> bool:
-        """Vráti True, ak má dym práve ísť."""
+               burst_s: float, blackout: bool, drop: bool | None = None) -> bool:
+        """Vráti True, ak má dym práve ísť.
+
+        drop: udalosť dropu z analýzy skladby (engine); None = vlastný odhad z hlasitosti.
+        """
         loud = 0.5 * a.level + 0.5 * a.bass
-        drop = (not a.silent and loud > 0.8 and self._energy < 0.45)
+        if drop is None:
+            drop = (not a.silent and loud > 0.8 and self._energy < 0.45)
         self._energy += (loud - self._energy) * 0.01   # ~2,5 s pri 40 fps
 
         ready = now >= self._ready_at

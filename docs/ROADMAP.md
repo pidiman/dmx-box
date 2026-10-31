@@ -5,6 +5,7 @@
 - [ ] Nasadenie na Raspberry Pi 3B+ (`install.sh`), míľniky M0–M5 z [PROJEKT.md](PROJEKT.md)
 - [ ] Overiť naživo: Belka UV (kanál 11 pri kanáli 12 = 0), parbar kanály 2–3, spot strobo/rýchlosť/program
 - [ ] Doladiť efekty na skutočnej hudbe (vizualizácia `viz.html` + svetlá)
+- [ ] Overiť rozpoznanie štýlu na reálnych skladbách (pravidlá sú ladené na syntetických vzoroch) a doladiť prahy v `genre.py`
 
 ## Odložené: správa svetiel (pridať / odobrať / adresy z UI)
 
@@ -27,3 +28,5 @@ Podmienka: súčasné nastavenie a presety ostanú funkčné; testy overia, že 
 - AirPlay vstup (`shairport-sync`) pre iPhone/iPad
 - Tap sync pre light delay pri Bluetooth reproduktore
 - Ovládanie z Home Assistant (REST API už existuje)
+- Štýl hudby: ďalšie žánre (trap/dubstep half-time, rock, latino), editor štýlov v UI, krátka tma tesne pred dropom (potrebuje predikciu dĺžky buildu)
+- Voliteľne menší ML model (napr. TFLite) na žáner, ak pravidlá na reálnej hudbe nebudú stačiť

@@ -17,7 +17,9 @@ from dmxbox.effects.movement import MOVE_FX  # noqa: E402
 from dmxbox.engine import Engine  # noqa: E402
 from dmxbox.fixtures import load_rig  # noqa: E402
 from dmxbox.sim import synth_source  # noqa: E402
+from dmxbox.fog import FogController  # noqa: E402
 from dmxbox.state import Store  # noqa: E402
+from dmxbox.styles import LOOKS  # noqa: E402
 
 
 def run_analyzer(bpm: float, seconds: float = 14, **kw) -> Analyzer:
@@ -191,3 +193,95 @@ def test_fog_dmx(engine):
     assert eng.compute(a, 100.0)[32] == 255     # DMX 33 = dym
     store.update(fog=False)
     assert eng.compute(a, 100.1)[32] == 0
+
+
+# --- štýl hudby a fázy skladby ------------------------------------------------
+
+@pytest.mark.parametrize("genre", ["house", "techno", "dnb", "hiphop", "chill", "party"])
+def test_genre_classification(genre):
+    """Syntetické vzory žánrov (sim.PATTERNS) sa rozpoznajú správne."""
+    an = Analyzer(iter(()), silence_seconds=2)
+    for blk in synth_source(bpm=None, genre=genre, seconds=40):
+        an.process(blk)
+    s = an.snapshot()
+    assert s.style == genre, (s.style, s.style_scores, s.features)
+
+
+def test_sections_breakdown_build_drop():
+    an = Analyzer(iter(()), silence_seconds=2)
+    seen = []
+    for blk in synth_source(bpm=None, genre="house", seconds=56, breakdown=(30, 44)):
+        an.process(blk)
+        s = an.snapshot()
+        if not seen or seen[-1][0] != s.section:
+            seen.append((s.section, s.t))
+    names = [n for n, _ in seen]
+    assert names[:2] == ["main", "breakdown"]
+    assert "build" in names
+    drop_t = dict((n, t) for n, t in seen)["drop"]
+    assert 43 <= drop_t <= 46.5                 # na prvý kick po breakdowne
+    assert an.snapshot().drop_count == 1
+
+
+def test_style_fixed_and_auto(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    a.style = "chill"
+    store.update(auto=True, style="auto")
+    eng.compute(a, 1.0)
+    assert eng.status.style == "chill" and eng.status.style_auto
+    assert eng.status.color_fx in {c for c, _ in LOOKS["chill"].sets}
+    store.update(style="techno")
+    eng.compute(a, 1.1)
+    assert eng.status.style == "techno" and not eng.status.style_auto
+
+
+def test_breakdown_calm_and_drop_hit(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    a.silent = False
+    store.update(auto=True, style="dnb", laser=True)
+    a.section = "breakdown"
+    f = eng.compute(a, 1.0)
+    assert (eng.status.color_fx, eng.status.move_fx) == LOOKS["dnb"].calm
+    assert f[29] == 0 and f[31] == 0            # bez lasera a bez stroboskopu
+    a.section, a.drop_count = "drop", a.drop_count + 1
+    f = eng.compute(a, 1.1)
+    assert 201 <= f[0] <= 255                   # krátke strobo na prvú dobu dropu
+    a.beat_count += 2
+    f = eng.compute(a, 1.2)
+    assert f[0] == 0                            # po 1 dobe späť na FX
+
+
+def test_fog_on_drop_event(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    a.silent = False
+    store.update(fog_auto=True, style="techno")
+    assert eng.compute(a, 200.0)[32] == 0
+    a.drop_count += 1
+    assert eng.compute(a, 200.1)[32] == 255
+    store.update(style="chill")                 # chill: dym na drop nie
+    eng.fog = FogController()
+    a.drop_count += 1
+    assert eng.compute(a, 300.0)[32] == 0
+
+
+def test_api_style(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from dmxbox.api import create_app
+    from dmxbox.audio_ctl import LineIn
+    from dmxbox.main import Box
+
+    rig = load_rig()
+    an = run_analyzer(120, seconds=6)
+    store = Store(tmp_path / "p.json")
+    out = DMXOut(driver="dry")
+    box = Box(store, an, Engine(rig, an, store, out), out, LineIn())
+    c = TestClient(create_app(box))
+    d = c.get("/api/state").json()
+    assert {s["key"] for s in d["catalog"]["styles"]} == {"party", "dnb", "techno", "house", "hiphop", "chill"}
+    assert "music" in d and "section" in d["engine"]
+    assert c.post("/api/settings", json={"style": "dnb"}).json()["style"] == "dnb"
+    assert c.post("/api/settings", json={"style": "polka"}).status_code == 400

@@ -320,7 +320,8 @@ function connect() {
     const d = JSON.parse(m.data);
     dmx = d.ch.concat(new Array(512 - d.ch.length).fill(0));
     bpm = d.bpm || 120; silent = d.silent;
-    document.getElementById("bpm").textContent = silent ? "ticho" : `${Math.round(bpm)} BPM`;
+    document.getElementById("bpm").textContent = silent ? "ticho"
+      : `${Math.round(bpm)} BPM · ${d.style || ""}${d.section && d.section !== "main" ? " · " + d.section.toUpperCase() : ""}`;
     updatePanel();
   };
   ws.onclose = () => { conn.textContent = "offline"; conn.className = "pill off"; setTimeout(connect, 1500); };

@@ -13,7 +13,10 @@ const PALETTE_SW = {
   warm: ["#f00", "#f60", "#f3a", "#fb3"],
   ice: ["#fff", "#6cf", "#00f", "#8ff"],
   fire: ["#f00", "#f50", "#f90", "#f44"],
+  urban: ["#90f", "#f90", "#f09", "#20f"],
 };
+const SECTION_NAMES = { main: "hrá", breakdown: "breakdown", build: "build-up", drop: "DROP" };
+let styleNames = {};
 
 let settings = {};
 let presets = new Set();
@@ -51,13 +54,27 @@ function buildWheel(el, list, key) {
   });
 }
 
+function buildStyles(list) {
+  const box = $("#styles"); box.innerHTML = "";
+  [{ key: "auto", name: "AUTO" }, ...list].forEach((st) => {
+    styleNames[st.key] = st.name;
+    const b = document.createElement("button");
+    b.dataset.style = st.key;
+    b.textContent = st.key === "auto" ? "AUTO" : st.name.replace("Drum & Bass", "DnB").replace("Pop / party", "Pop");
+    b.onclick = () => patch({ style: st.key, auto: true });
+    box.appendChild(b);
+  });
+}
+
 function buildPalettes(list) {
-  const box = $("#palettes"); box.innerHTML = "";
+  const box = $("#palettes");
+  box.querySelectorAll(".chip:not(#pal-style)").forEach((c) => c.remove());
+  $("#pal-style").onclick = () => patch({ style_palette: true, manual_color: null });
   list.forEach((p) => {
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.p = p;
     b.innerHTML = `<span class="sw">${(PALETTE_SW[p] || []).map((c) => `<i style="background:${c}"></i>`).join("")}</span><b>${p}</b>`;
-    b.onclick = () => patch({ palette: p, manual_color: null });
+    b.onclick = () => patch({ palette: p, style_palette: false, manual_color: null });
     box.appendChild(b);
   });
 }
@@ -109,7 +126,10 @@ function apply(s) {
   $("#blackout").classList.toggle("on", s.blackout);
   for (const id of ["laser", "uv", "line_in", "fog_auto"]) $("#" + id).checked = !!s[id];
   if (dragging !== "fog_burst_s") { $("#fog_burst_s").value = s.fog_burst_s; $("#burst-out").textContent = s.fog_burst_s + " s"; }
-  document.querySelectorAll(".chip").forEach((b) => b.classList.toggle("on", b.dataset.p === s.palette && !s.manual_color));
+  const palStyle = s.auto && s.style_palette;
+  document.querySelectorAll(".chip").forEach((b) => b.classList.toggle("on", !s.manual_color &&
+    (b.dataset.p === "__style" ? palStyle : !palStyle && b.dataset.p === s.palette)));
+  document.querySelectorAll("#styles button").forEach((b) => b.classList.toggle("on", s.auto && b.dataset.style === s.style));
   if (s.manual_color) $("#manual").value = hex(s.manual_color);
 }
 
@@ -128,6 +148,15 @@ function live(d) {
   $("#cur-move").textContent = e.idle ? "" : (NAMES[e.move_fx] || e.move_fx);
   document.querySelectorAll("#wheel-color button").forEach((b) => b.classList.toggle("active", b.dataset.fx === e.color_fx));
   document.querySelectorAll("#wheel-move button").forEach((b) => b.classList.toggle("active", b.dataset.fx === e.move_fx));
+  const m = d.music;
+  if (m) {
+    const sure = Math.round(m.confidence * 100);
+    $("#style-detect").textContent = a.silent ? "ticho" : `rozpoznané: ${m.name} · ${sure} %`;
+    $("#style-now").textContent = e.idle ? "" : (styleNames[e.style] || e.style) + (e.style_auto ? "" : " (pevne)");
+    const sec = $("#section");
+    sec.textContent = a.silent ? "—" : SECTION_NAMES[e.section] + (e.section === "build" ? ` ${Math.round(m.build * 100)} %` : "");
+    sec.className = "pill sec-" + e.section;
+  }
   const f = d.fog || {}, fb = $("#fog");
   fb.style.display = f.present === false ? "none" : "";
   fb.classList.toggle("on", !!f.on);
@@ -198,6 +227,7 @@ async function init() {
   const d = await api("GET", "/api/state");
   buildWheel($("#wheel-color"), d.catalog.color_fx, "color_fx");
   buildWheel($("#wheel-move"), d.catalog.move_fx, "move_fx");
+  buildStyles(d.catalog.styles || []);
   buildPalettes(d.catalog.palettes);
   buildPresets();
   presets = new Set(d.presets); paintPresets();

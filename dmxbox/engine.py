@@ -2,6 +2,9 @@
 
 Poradie vrstiev (vyššia prepíše nižšiu):
 blackout > strobe hold > manuálna farba > FX koleso 1 (farby) + 2 (pohyb) > master
+
+Auto mód: FX dvojice, paleta a povolené efekty podľa štýlu hudby (styles.py, rozpoznaný
+alebo pevne zvolený) a fázy skladby (breakdown / build / drop).
 """
 
 from __future__ import annotations
@@ -10,37 +13,25 @@ import logging
 import math
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .audio import Analyzer, AudioState
 from .dmx_out import DMXOut
-from .effects import Ctx, Look, scale
+from .effects import OFF, Ctx, Look, scale
 from .effects.color import COLOR_FX, PALETTES
 from .effects.movement import MOVE_FX
-from .fixtures import Rig, clamp8
+from .fixtures import Rig
 from .fog import FogController
 from .state import Store
+from .styles import LOOKS, StyleLook, look_for
 
 log = logging.getLogger("dmxbox.engine")
-
-# Auto mód: dvojice (farby, pohyb) podľa tempa
-AUTO_SETS = {
-    "slow": [("rainbow", "circle_slow"), ("color_step", "audience"), ("bass_pump", "gobo_beat")],
-    "mid": [("beat_chase", "jump"), ("split", "sweep"), ("bass_pump", "tilt_bounce"),
-            ("derby_party", "snap"), ("color_step", "gobo_beat"), ("kick_flash", "jump")],
-    "fast": [("kick_flash", "snap"), ("split", "jump"), ("build_up", "sweep"),
-             ("derby_party", "jump")],
-}
 
 # farby kolieska moving headu (fixtures.yaml → values.color) ako RGB
 HEAD_WHEEL = {
     "white": (1, 1, 1), "red": (1, 0, 0), "yellow": (1, 1, 0), "blue": (0, 0, 1),
     "green": (0, 1, 0), "orange": (1, 0.5, 0), "pink": (1, 0, 1), "cyan": (0, 1, 1),
 }
-
-
-def tempo_class(bpm: float) -> str:
-    return "slow" if bpm < 100 else "fast" if bpm >= 150 else "mid"
 
 
 @dataclass
@@ -50,6 +41,9 @@ class Status:
     auto_index: int = 0
     idle: bool = True
     frame: int = 0
+    style: str = "party"        # štýl, podľa ktorého sa práve svieti
+    style_auto: bool = True     # rozpoznaný (True) alebo pevne zvolený
+    section: str = "main"
 
 
 class Engine(threading.Thread):
@@ -65,6 +59,8 @@ class Engine(threading.Thread):
         self._auto_i = 0
         self.last_frame = bytearray(512)
         self.fog = FogController()
+        self._drop_count = 0
+        self._drop_beat = -1e9      # beat, kedy začal posledný drop
 
     def stop(self) -> None:
         self._halt.set()
@@ -76,14 +72,36 @@ class Engine(threading.Thread):
         self._last_onset = a.onset_count
         self._flash = 1.0 if onset else self._flash * 0.82
 
+        # štýl: rozpoznaný z hudby alebo pevne zvolený
+        style_auto = s.style not in LOOKS
+        look = look_for(a.style if style_auto else s.style)
+        self.status.style, self.status.style_auto = look.key, style_auto
+        section = a.section if s.auto else "main"
+        self.status.section = section
+        drop_event = a.drop_count != self._drop_count
+        if drop_event:
+            self._drop_count = a.drop_count
+            self._drop_beat = a.beats
+
+        palette_name = s.palette
+        fs = s                       # nastavenia pre efekty (štýl ich v auto móde doladí)
+        if s.auto:
+            if s.style_palette:
+                palette_name = look.palette
+            fs = replace(s, fade=min(1.0, max(0.0, s.fade + look.fade_bias)),
+                         size=min(1.0, max(0.0, s.size * look.size_k)),
+                         laser=s.laser and look.laser and section != "breakdown",
+                         uv=s.uv and look.uv)
+
         beats = a.beats * s.speed
         beat = int(math.floor(beats))
-        ctx = Ctx(a=a, s=s, beats=beats, beat=beat, phase=beats - beat, bar=beat // 4,
+        ctx = Ctx(a=a, s=fs, beats=beats, beat=beat, phase=beats - beat, bar=beat // 4,
                   onset=onset, flash=self._flash,
-                  palette=PALETTES.get(s.palette, PALETTES["party"]), t=now)
+                  palette=PALETTES.get(palette_name, PALETTES["party"]), t=now)
 
-        color_name, move_name = self._pick_fx(s, a, ctx.bar)
+        color_name, move_name = self._pick_fx(s, a, ctx.bar, look, section)
         L = Look()
+        drop_strobe = False
         if a.silent and not s.strobe:
             self._idle(ctx, L)
             self.status.idle = True
@@ -91,6 +109,8 @@ class Engine(threading.Thread):
             COLOR_FX[color_name](ctx, L)
             MOVE_FX[move_name](ctx, L)
             self.status.idle = False
+            if s.auto:
+                drop_strobe = self._shape(L, look, section, a, fs)
         self.status.color_fx, self.status.move_fx = color_name, move_name
 
         if s.manual_color:
@@ -102,10 +122,11 @@ class Engine(threading.Thread):
         if not s.uv and L.strobe_speed == 0:
             L.strobe_uv = 0.0
 
-        fog_on = self.fog.update(now, a, s.fog, s.fog_auto, s.fog_burst_s, s.blackout)
+        fog_on = self.fog.update(now, a, s.fog, s.fog_auto, s.fog_burst_s, s.blackout,
+                                 drop=drop_event and look.fog_drop and not a.silent)
 
         frame = self.rig.new_frame()
-        self._write(frame, L, s.master, strobe=s.strobe)
+        self._write(frame, L, s.master, strobe=s.strobe or drop_strobe)
         self._write_fog(frame, L, fog_on, s.master)
         if s.blackout:
             frame = self.rig.new_frame()
@@ -113,16 +134,51 @@ class Engine(threading.Thread):
         self.status.frame += 1
         return frame
 
-    def _pick_fx(self, s, a: AudioState, bar: int) -> tuple[str, str]:
+    def _pick_fx(self, s, a: AudioState, bar: int, look: StyleLook, section: str) -> tuple[str, str]:
         if not s.auto:
             return s.color_fx, s.move_fx
-        sets = AUTO_SETS[tempo_class(a.bpm)]
-        if self._auto_bar < 0 or (bar - self._auto_bar) >= max(1, s.auto_bars) or bar < self._auto_bar:
+        if section == "breakdown":
+            return look.calm
+        if section == "build":
+            return look.build
+        if section == "drop":
+            return look.drop
+        # main: striedanie dvojíc štýlu; auto_bars (predvolene 16) škáluje tempo striedania štýlu
+        every = max(1, round(look.bars * s.auto_bars / 16))
+        if self._auto_bar < 0 or (bar - self._auto_bar) >= every or bar < self._auto_bar:
             if self._auto_bar >= 0:
                 self._auto_i += 1
             self._auto_bar = bar
         self.status.auto_index = self._auto_i
-        return sets[self._auto_i % len(sets)]
+        return look.sets[self._auto_i % len(look.sets)]
+
+    def _shape(self, L: Look, look: StyleLook, section: str, a: AudioState, fs) -> bool:
+        """Úprava podľa štýlu a fázy skladby. Vráti True, ak má ísť krátke strobo dropu."""
+        if not look.derby:
+            L.derby, L.derby_motor = OFF, 0.0
+        L.pt_speed = max(L.pt_speed, look.pt_slow)
+        if section == "breakdown":
+            # pokoj: tlmené farby, pomalý pohyb, bez lasera a stroboskopu (UV môže ostať)
+            L.bar_dim *= 0.5
+            L.par = scale(L.par, 0.4)
+            L.derby, L.derby_motor = OFF, 0.0
+            L.head_dim *= 0.6
+            L.laser = "off"
+            L.strobe_speed = 0.0
+            L.strobe_uv = 0.6 if fs.uv else 0.0
+            L.pt_speed = max(L.pt_speed, 0.7)
+        elif section == "build":
+            # napätie rastie: Belka strobo postupne zrýchľuje, lišta jasnie
+            p = a.build_progress
+            L.bar_dim = max(L.bar_dim, 0.3 + 0.5 * p)
+            if look.strobe_drop and p > 0.25:
+                L.strobe_uv, L.strobe_speed = 0.4 + 0.6 * p, 0.15 + 0.75 * p
+        elif section == "drop":
+            since = a.beats - self._drop_beat
+            L.bar_dim = max(L.bar_dim, 0.9)
+            L.head_dim = max(L.head_dim, 0.9)
+            return look.strobe_drop and 0.0 <= since < 1.0     # strobo len 1 dobu
+        return False
 
     def _idle(self, c: Ctx, L: Look) -> None:
         """Ticho: pomalé dýchanie lišty, ostatné zhasnuté."""
@@ -243,3 +299,4 @@ class Engine(threading.Thread):
                 time.sleep(sleep)
             else:
                 next_t = time.monotonic()
+

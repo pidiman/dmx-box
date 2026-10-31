@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
 PRESET_KEYS = ("color_fx", "move_fx", "speed", "size", "fade", "palette",
-               "master", "auto", "auto_bars", "laser", "uv", "fog_auto")
+               "master", "auto", "auto_bars", "laser", "uv", "fog_auto", "style", "style_palette")
 
 
 @dataclass
@@ -24,6 +24,8 @@ class Settings:
     strobe: bool = False        # drží sa tlačidlom v UI
     auto: bool = True
     auto_bars: int = 16
+    style: str = "auto"         # auto = rozpoznať žáner, inak pevne: dnb/techno/house/hiphop/chill/party
+    style_palette: bool = True  # v auto móde použiť paletu štýlu (inak `palette`)
     laser: bool = True
     uv: bool = True             # povoliť stály UV podklad na Belke
     manual_color: list | None = None   # [r, g, b, w] 0–1, prepíše FX

@@ -7,16 +7,19 @@ Vstup je mono float32 stream po blokoch `hop` vzoriek – na Pi z `parec`
 from __future__ import annotations
 
 import collections
+import math
 import copy
 import logging
 import shutil
 import subprocess
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterator
 
 import numpy as np
+
+from .genre import MusicAnalyzer
 
 log = logging.getLogger("dmxbox.audio")
 
@@ -36,6 +39,14 @@ class AudioState:
     rms: float = 0.0            # surová hlasitosť
     silent: bool = True
     t: float = 0.0              # čas v sekundách podľa počtu vzoriek
+    # štýl a fáza skladby (genre.py)
+    style: str = "party"
+    style_confidence: float = 0.0
+    style_scores: dict = field(default_factory=dict)
+    section: str = "main"       # main | breakdown | build | drop
+    drop_count: int = 0
+    build_progress: float = 0.0
+    features: dict = field(default_factory=dict)
 
     @property
     def beats(self) -> float:
@@ -154,17 +165,30 @@ class Analyzer(threading.Thread):
         self.window = np.hanning(fft).astype(np.float32)
         freqs = np.fft.rfftfreq(fft, 1.0 / rate)
         self.bands = {
-            "kick": (freqs >= 40) & (freqs < 160),
+            "kick": (freqs >= 30) & (freqs < 115),   # úzko: snare/tom presakuje do 130+ Hz
             "bass": (freqs >= 20) & (freqs < 150),
             "mid": (freqs >= 150) & (freqs < 2000),
             "high": (freqs >= 2000) & (freqs < 16000),
+            "snare": (freqs >= 150) & (freqs < 1000),   # telo snare/clapu; hi-haty sú vyššie
+            "hat": (freqs >= 6000) & (freqs < 16000),
         }
+        self.freqs = freqs
+        self.music = MusicAnalyzer()
         self.buf = np.zeros(fft, dtype=np.float32)
         self.prev_mag: np.ndarray | None = None
+        self.prev_lin: np.ndarray | None = None
+        self._kick_lin_peak = 1e-6   # lineárny flux basy: kick vs. presak snare (log flux ich zrovná)
 
         hist = int(self.frame_rate * 8)     # 8 s histórie onset krivky
         self.flux_hist: collections.deque[float] = collections.deque(maxlen=hist)
         self.kick_hist: collections.deque[float] = collections.deque(maxlen=int(self.frame_rate))
+        self.snare_hist: collections.deque[float] = collections.deque(maxlen=int(self.frame_rate))
+        self.hat_hist: collections.deque[float] = collections.deque(maxlen=int(self.frame_rate))
+        self._mean_kick = 1e-3
+        self._band_peak = {"snare": 1e-3, "hat": 1e-3}
+        self._kick_peak = 1e-3      # pomaly klesajúce maximum kick fluxu (brána proti šumu)
+        self._mean_flux = 1e-3
+        self._mean_snare = 1e-3
         self.bpm_votes: collections.deque[float] = collections.deque(maxlen=7)
         self.agc = {k: AGC() for k in ("bass", "mid", "high", "level")}
         self.env = {k: Envelope(0.6, 0.08) for k in ("bass", "mid", "high", "level")}
@@ -251,9 +275,40 @@ class Analyzer(threading.Thread):
         diff = np.maximum(logmag - self.prev_mag, 0.0)
         self.prev_mag = logmag
         flux = float(np.sum(diff))
+        km = self.bands["kick"]
+        lin = mag[km]
+        kick_lin = float(np.sum(np.maximum(lin - self.prev_lin, 0.0))) if self.prev_lin is not None else 0.0
+        self.prev_lin = lin
+        self._kick_lin_peak = max(kick_lin, self._kick_lin_peak * math.exp(-dt / 10.0))
         kick = float(np.sum(diff[self.bands["kick"]]))
-        self.flux_hist.append(flux)
+        snare_f = float(np.sum(diff[self.bands["snare"]]))
+        hat_f = float(np.sum(diff[self.bands["hat"]]))
+        p = mag ** 2
+        total_e = float(p.sum()) + 1e-12
+        centroid = float((self.freqs * p).sum() / total_e)
+        sub = energies["bass"] * self.bands["bass"].sum() / total_e
+        # krivka pre tempo: hlavne kick (16-kové hi-haty inak ťahajú tempo mimo)
+        self._mean_kick += (kick - self._mean_kick) * 0.002
+        self._mean_flux += (flux - self._mean_flux) * 0.002
+        self._mean_snare += (snare_f - self._mean_snare) * 0.002
+        kick_rel = kick / (self._mean_kick + 1e-9)
+        snare_rel = snare_f / (self._mean_snare + 1e-9)
+        self.flux_hist.append(kick_rel + 0.6 * snare_rel + 0.3 * flux / (self._mean_flux + 1e-9))
         self.kick_hist.append(kick)
+        self.snare_hist.append(snare_f)
+        self.hat_hist.append(hat_f)
+
+        def peak(x: float, hist, key: str) -> float:
+            """Len výrazné údery: nad lokálnou úrovňou pásma aj nad 30 % jeho nedávneho maxima (nie šum)."""
+            self._band_peak[key] = max(x, self._band_peak[key] * math.exp(-dt / 10.0))
+            if len(hist) < 10 or x < 0.3 * self._band_peak[key]:
+                return 0.0
+            arr = np.fromiter(hist, dtype=np.float64)
+            thr = float(np.median(arr) + 1.2 * np.std(arr))
+            return max(0.0, x - thr)
+
+        snare_pk = peak(snare_f, self.snare_hist, "snare")
+        hat_pk = peak(hat_f, self.hat_hist, "hat")
 
         silent_now = rms < self.silence_floor
         if not silent_now:
@@ -266,7 +321,8 @@ class Analyzer(threading.Thread):
         if len(self.kick_hist) > 10 and not silent_now:
             arr = np.fromiter(self.kick_hist, dtype=np.float64)
             thr = float(np.median(arr) + 1.6 * np.std(arr)) + 1e-3
-            if kick > thr and t - self._last_onset_t > 0.12:
+            self._kick_peak = max(kick, self._kick_peak * math.exp(-dt / 10.0))
+            if kick > thr and kick > 0.3 * self._kick_peak and t - self._last_onset_t > 0.12:
                 onset = True
                 strength = min(1.0, kick / (thr * 2.0))
                 self._last_onset_t = t
@@ -296,6 +352,24 @@ class Analyzer(threading.Thread):
             s.rms = rms
             s.silent = silent
             s.t = t
+            pos2 = (s.beat_count % 2) + s.beat_phase
+            beats_now = s.beat_count + s.beat_phase
+            bpm_now = self._override_bpm or s.bpm
+        # do rytmického profilu len údery, kde prevláda basové pásmo (nie snare)
+        kick_hit = onset and kick_lin > 0.45 * self._kick_lin_peak
+        # snare do profilu len ak v tej chvíli nebije kick (klik kicku presakuje do stredov)
+        if kick_lin > 0.2 * self._kick_lin_peak:
+            snare_pk = 0.0
+        info = self.music.update(t, dt, pos2=pos2, beats=beats_now, bpm=bpm_now,
+                                 kick=strength if kick_hit else 0.0, snare=snare_pk, hat=hat_pk, centroid=centroid, sub=sub,
+                                 level=vals["level"], high=vals["high"], onset=kick_hit,
+                                 onset_strength=strength, silent=silent)
+        with self._lock:
+            s.style, s.style_confidence = info.style, info.style_confidence
+            s.style_scores = dict(info.scores)
+            s.section, s.drop_count = info.section, info.drop_count
+            s.build_progress = info.build_progress
+            s.features = info.features
 
     def _estimate_tempo(self) -> None:
         if self._override_bpm is not None or len(self.flux_hist) < self.frame_rate * 4:
@@ -313,10 +387,15 @@ class Analyzer(threading.Thread):
         lags = np.arange(lag_min, lag_max)
         # skóre: hlavný lag + jeho násobky (stabilnejšie voči half/double)
         score = ac[lags].copy()
-        for mult in (2, 3, 4):
-            idx = lags * mult
-            ok = idx < len(ac)
-            score[ok] += ac[idx[ok]] * 0.5
+        for mult in (2, 4):          # párne metrum (4/4) – trojnásobky by ťahali na 4/3 tempa
+            for j, lag in enumerate(lags):
+                c = lag * mult
+                if c + mult < len(ac):   # okno ±mult snímok: úzke špičky sa pri zaokrúhlení lagu strácajú
+                    score[j] += ac[c - mult:c + mult + 1].max() * 0.5
+        # prior okolo 120 BPM (Ellis 2007) – rieši half/double nejednoznačnosť
+        bpms = 60.0 * fr / lags
+        prior = np.exp(-0.5 * (np.log2(bpms / 120.0) / 1.4) ** 2)
+        score = np.where(score > 0, score * prior, score)
         best = int(lags[int(np.argmax(score))])
         # parabolická interpolácia pre presnejší lag
         if lag_min < best < lag_max - 1:

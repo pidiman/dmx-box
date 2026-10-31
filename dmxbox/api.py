@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from .config import ROOT
 from .effects.color import COLOR_FX, PALETTES
 from .effects.movement import MOVE_FX
+from .genre import STYLE_NAMES
+from .styles import STYLE_CHOICES, catalog as style_catalog
 
 
 class Patch(BaseModel):
@@ -54,7 +56,13 @@ def create_app(box) -> FastAPI:
                       "bass": round(a.bass, 3), "mid": round(a.mid, 3),
                       "high": round(a.high, 3), "level": round(a.level, 3),
                       "silent": a.silent},
-            "engine": {"color_fx": st.color_fx, "move_fx": st.move_fx, "idle": st.idle},
+            "engine": {"color_fx": st.color_fx, "move_fx": st.move_fx, "idle": st.idle,
+                       "style": st.style, "style_auto": st.style_auto, "section": st.section},
+            "music": {"style": a.style, "name": STYLE_NAMES.get(a.style, a.style),
+                      "confidence": round(a.style_confidence, 2),
+                      "scores": {k: round(v, 2) for k, v in a.style_scores.items()},
+                      "section": a.section, "drops": a.drop_count,
+                      "build": round(a.build_progress, 2)},
             "dmx": {"driver": box.out.driver, "connected": box.out.connected,
                     "frames": box.out.frames_sent},
             "line_in": box.line_in.on,
@@ -67,7 +75,7 @@ def create_app(box) -> FastAPI:
     def get_state():
         data = snapshot()
         data["catalog"] = {"color_fx": list(COLOR_FX), "move_fx": list(MOVE_FX),
-                           "palettes": list(PALETTES)}
+                           "palettes": list(PALETTES), "styles": style_catalog()}
         data["presets"] = sorted(int(k) for k in box.store.presets)
         return data
 
@@ -91,6 +99,8 @@ def create_app(box) -> FastAPI:
             raise HTTPException(400, "neznámy move_fx")
         if "palette" in data and data["palette"] not in PALETTES:
             raise HTTPException(400, "neznáma paleta")
+        if "style" in data and data["style"] not in STYLE_CHOICES:
+            raise HTTPException(400, "neznámy štýl")
         if "line_in" in data:
             box.line_in.set(bool(data["line_in"]))
         return asdict(box.store.update(**data))
@@ -168,8 +178,10 @@ def create_app(box) -> FastAPI:
         try:
             while True:
                 a = box.analyzer.snapshot()
+                st = box.engine.status
                 await sock.send_json({"ch": list(box.out.last), "bpm": round(a.bpm, 1),
-                                      "silent": a.silent})
+                                      "silent": a.silent, "style": STYLE_NAMES.get(st.style, st.style),
+                                      "section": st.section})
                 await asyncio.sleep(0.033)
         except (WebSocketDisconnect, RuntimeError):
             pass

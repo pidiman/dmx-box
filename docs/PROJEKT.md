@@ -359,7 +359,50 @@ Každý frame (25 ms) sa skladá v tomto poradí. Vyššia vrstva prepíše niž
 
 **Modifikátory** spoločné pre obe kolesá: speed (½× / 1× / 2× BPM), size (amplitúda pohybu alebo rozsah jasu), fade (mäkkosť prechodov), paleta farieb, fan (fázový posun medzi hlavami).
 
-**Auto mód:** každých N taktov (8/16/32) vyberie inú dvojicu FX z povoleného zoznamu. Na párty bez obsluhy je to hlavný režim.
+**Auto mód:** každých N taktov vyberie inú dvojicu FX zo zoznamu aktuálneho **štýlu hudby** a reaguje na fázu skladby. Na párty bez obsluhy je to hlavný režim.
+
+### Štýl hudby (auto rozpoznanie alebo pevne)
+
+Box sám odhadne žáner a podľa neho mení štýl blikania. V UI sa dá štýl aj pevne zvoliť: **AUTO / Pop / DnB / Techno / House / Hip-hop / Chill**.
+
+Rešerš: hotové „žánrové presety“ pre DMX svetlá sa verejne nedajú stiahnuť. Najbližšie riešenia pracujú inak:
+
+- **rekordbox Lighting (Pioneer DJ)** analyzuje **frázy** skladby (intro, up, down, chorus) a ku každej fráze priradí svetelnú scénu. Žáner nerieši.
+- **MaestroDMX** mení paletu a pohyb podľa nálady a energie hudby.
+- Praktické rady pre EDM light show: v breakdowne pokoj a tlmené statické farby, v builde postupne zrýchľovať (nie strobo na každý úder), na drope udrieť na prvý úder a strobo nechať krátke.
+- Typické znaky žánrov (tempo a rytmus) podľa DJ príručiek: house 118–130 BPM four-on-the-floor s offbeat hi-hatom, techno 125–150 BPM four-on-the-floor s tmavším zvukom, DnB 160–180 BPM s breakbeatom, hip-hop 70–100 BPM so synkopovaným kickom a snare na 2 a 4.
+
+DMX-BOX preto spája obe veci: **štýl podľa žánru + scény podľa fázy skladby**.
+
+**Rozpoznanie** (`genre.py`, len numpy, beží aj na Pi 3B+):
+
+1. **Rytmický profil:** kde v 2-dobovom cykle (8 šestnástin) padajú kick, snare a hi-hat. Kick sa odlišuje od presakujúceho snare podľa lineárneho nárastu basy.
+2. **Znaky:** four-on-the-floor, synkopy, backbeat, offbeat hi-hat, hustota úderov za sekundu (nezávisí od toho, či sa tempo číta 87 alebo 174), kicky za dobu, jas zvuku (spektrálny centroid), podiel basy.
+3. **Fuzzy pravidlá** dajú skóre 0–1 každému štýlu. Hysteréza zabraňuje skákaniu: nový štýl musí vyhrávať aspoň 8 s (prvé rozhodnutie po 3 s). Odhad je hotový asi 10–15 s po začiatku skladby.
+
+**Fáza skladby** (ako frázy v rekordboxe):
+
+| Fáza | Ako sa pozná | Čo robia svetlá |
+| --- | --- | --- |
+| main | normálny priebeh | striedanie FX dvojíc štýlu |
+| breakdown | 2 s bez kicku alebo pokles hlasitosti | tlmené farby, pomalý pohyb, bez lasera, derby a stroboskopu, UV podklad |
+| build | breakdown a rastú výšky alebo hlasitosť | Belka strobo postupne zrýchľuje, lišta jasnie |
+| drop | prvý kick po aspoň 4 s pokoja | plný jas, 1 doba stroboskopu, dym (ak je zapnutý auto dym) |
+
+**Štýly** (`styles.py`):
+
+| Štýl | Paleta | Charakter | Laser | Strobo/dym na drop |
+| --- | --- | --- | --- | --- |
+| DnB | fire | rýchle, ostré, kick flash + snap, mení sa každých 8 taktov | áno | áno / áno |
+| Techno | ice | chladné, minimalistické, sweep a tilt, bez derby | áno | áno / áno |
+| House | warm | groove, bass pump, derby, plynulý pohyb | áno | áno / áno |
+| Hip-hop | urban (fialová, zlatá) | údery na kick, gobo, pomalší pohyb | nie | áno / nie |
+| Chill | cool | dúha, pomalý kruh, mäkké prechody | nie | nie / nie |
+| Pop / party | party | pestré, všetky FX | áno | áno / áno |
+
+Paleta sa riadi štýlom, kým v UI nezvolíš inú (chip „podľa štýlu“ to vráti). Vypínače Laser, UV a Auto dym v nastaveniach majú vždy prednosť pred štýlom.
+
+**Test bez hudby:** `python3 -m dmxbox.main --genre mix --dry --port 8080` strieda syntetické žánre po 60 s, každý s breakdownom, buildom a dropom.
 
 **Presety:** 50 slotov, preset = kompletný stav (oba FX, modifikátory, paleta, master). Uložené v `presets.json`.
 
@@ -374,6 +417,7 @@ Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu
 - Posuvníky: master, speed, size, fade.
 - Paleta farieb a color picker.
 - Tlačidlá: Auto, Blackout, Strobe (držíš), Tap tempo.
+- Štýl hudby: AUTO alebo pevný žáner, rozpoznaný štýl s istotou v % a fáza skladby (breakdown / build / DROP).
 - Presety 1–50 v mriežke, dlhý stlak = uložiť.
 - Nastavenia: light delay, line-in on/off, prah ticha, fixtures (adresy).
 
@@ -390,8 +434,8 @@ Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu
 | POST | `/api/auto` | `{"on": true, "bars": 16}` |
 | POST | `/api/preset/{n}` | načítať preset |
 | PUT | `/api/preset/{n}` | uložiť aktuálny stav |
-| POST | `/api/settings` | light delay, line-in, ticho |
-| WS | `/ws` | 20×/s: BPM, beat, VU, aktívne FX |
+| POST | `/api/settings` | light delay, line-in, `style` (`auto` / `dnb` / `techno` / `house` / `hiphop` / `chill` / `party`), `style_palette` |
+| WS | `/ws` | 20×/s: BPM, beat, VU, aktívne FX, štýl, fáza skladby |
 
 Frontend je čistý HTML + CSS + vanilla JS (bez buildu), s `manifest.json` a service workerom pre ikonu na ploche a offline shell. REST umožní aj ovládanie z Home Assistant (napr. tlačidlo „Párty“ = preset + auto).
 
@@ -438,7 +482,10 @@ dmx-box/
 │   ├── dmx_out.py          # uDMX cez pyusb, light delay, auto-reconnect
 │   ├── audio.py            # parec → pásma, onsety, BPM, fáza beatu (len numpy)
 │   ├── audio_ctl.py        # line-in loopback cez pactl
-│   ├── sim.py              # syntetická hudba na testy
+│   ├── genre.py            # rozpoznanie štýlu hudby a fázy skladby
+│   ├── styles.py           # svetelné štýly podľa žánru
+│   ├── fog.py              # dymostroj: limity, auto výstrek na drop
+│   ├── sim.py              # syntetická hudba na testy (žánre, mix s breakdown/drop)
 │   ├── state.py            # nastavenia z UI + presety
 │   ├── engine.py           # 40 Hz slučka, vrstvy, auto mód, Look → DMX
 │   ├── api.py              # FastAPI REST + WebSocket + PWA
@@ -490,6 +537,7 @@ Každý míľnik má jasný test. Ďalší sa začína, až keď predošlý prej
 - [ ] **M6 – Engine v1:** jeden farebný FX (Beat chase) a jeden pohybový (Circle) bežia v tempe.
 - [ ] **M7 – Web UI:** z tabletu sa prepínajú FX, master, blackout a strobe s odozvou pod 100 ms.
 - [ ] **M8 – Všetky FX a presety:** 8 + 8 FX, modifikátory, auto mód, 50 presetov.
+- [ ] **M8b – Štýl hudby:** na reálnych skladbách (DnB, techno, house, hip-hop, chill, pop) sa štýl rozpozná do 15 s a drop spustí strobo/dym na prvý úder.
 - [ ] **M9 – Produkcia:** systemd služby, hotspot fallback, line-in prepínač, box nabehne sám po zapnutí do 60 s.
 - [ ] **M10 – Krabička:** 3D tlačená krabička s vetraním, káble upevnené.
 
