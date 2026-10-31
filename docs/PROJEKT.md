@@ -470,7 +470,7 @@ systemctl --user start dmxbox
 journalctl --user -u dmxbox -f
 ```
 
-**Vývoj bez hardvéru** (PC/Mac): `python3 -m dmxbox.main --sim 128 --dry --port 8080` a otvor `http://localhost:8080`. Testy: `python3 -m pytest -q tests`.
+**Vývoj bez hardvéru** (PC/Mac): `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`, potom `python3 -m dmxbox.main --sim 128 --dry --port 8080` a otvor `http://localhost:8080`. Testy: `python3 -m pytest -q tests`.
 
 **Aktualizácia:** `cd ~/dmx-box && git pull && systemctl --user restart dmxbox`. Vývoj môžeš robiť v Claude Code na PC, push na GitHub a pull na Pi, rovnako ako pri ostatných projektoch.
 

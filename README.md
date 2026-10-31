@@ -8,7 +8,7 @@ Samostatná krabička na **Raspberry Pi 3B+** inšpirovaná ADJ myDMX GO. Prijí
 - **Vstupy:** Bluetooth A2DP, Spotify Connect, voliteľne AirPlay a line-in (UCA202).
 - **Výstup zvuku:** UCA202 → AUX-in reproduktora (latencia ~10–20 ms, sync bez kalibrácie).
 - **DMX:** priamy uDMX výstup cez pyusb (32 kanálov po 8) → Lixada USB-DMX → XLR → wireless TX → RX pri svetlách.
-- **Mozog:** Python aplikácia `dmxbox` (aubio beat engine, FX kolesá, FastAPI + PWA).
+- **Mozog:** Python aplikácia `dmxbox` (numpy beat engine, FX kolesá, FastAPI + PWA).
 
 ## Svetlá
 
@@ -48,8 +48,9 @@ Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku).
 Bez hardvéru (vývoj na PC/Mac):
 
 ```bash
-pip install -r requirements.txt
-python3 -m dmxbox.main --sim 128 --dry --port 8080   # simulovaná hudba, DMX naprázdno
+python3 -m venv .venv && source .venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt pytest httpx
+python3 -m dmxbox.main --sim 128 --dry --port 8080   # simulovaná hudba, DMX naprázdno → http://localhost:8080
 python3 -m pytest -q tests
 ```
 
