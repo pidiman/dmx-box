@@ -56,6 +56,22 @@ python3 -m pytest -q tests
 
 Nástroje: `tools/dmx_test.py` (test kanálov), `tools/audio_meter.py` (BPM a pásma v termináli).
 
+### Test so svetlami na Macu (pred nasadením na Pi)
+
+Rovnaký kód beží aj na Macu: hudba z Macu ide cez **BlackHole 2ch**, DMX cez Lixada dongle.
+
+```bash
+brew install libusb                      # pre pyusb (uDMX)
+source .venv/bin/activate && git pull && pip install -r requirements.txt
+python3 -m dmxbox.main --list-inputs     # nájdi "BlackHole 2ch"
+python3 tools/dmx_test.py walk all       # test kanálov (Enter = ďalší)
+python3 -m dmxbox.main --input "BlackHole 2ch" --port 8080
+```
+
+- V **Audio MIDI Setup** vytvor *Multi-Output Device* (reproduktory + BlackHole 2ch) a nastav ho ako výstup Macu, aby si hudbu počul a zároveň ju box analyzoval.
+- Ovládanie: `http://localhost:8080`, z mobilu `http://<ip-macu>:8080` (rovnaká Wi-Fi).
+- Svetlá: PartyBar4 `d001` 8CH, spot `A009` 12CH + `SL 1`, Belka `d021` 12CH.
+
 ## Stav
 
 Kód v0.1: audio analýza, engine s 8 + 8 FX, auto mód, presety, PWA, systemd a inštalácia. Otestované bez hardvéru (simulácia, 12 testov). Ďalší krok: M0–M3 na Pi so svetlami.

@@ -19,6 +19,21 @@ REQ_SET_CHANNEL_RANGE = 2
 BM_REQUEST_TYPE = 0x40  # vendor | device | host→device
 
 
+def _backend():
+    """libusb backend; na Macu s Homebrew nie je libusb v štandardnej ceste."""
+    import os
+
+    import usb.backend.libusb1 as lb
+    be = lb.get_backend()
+    if be is None:
+        for path in ("/opt/homebrew/lib/libusb-1.0.dylib", "/usr/local/lib/libusb-1.0.dylib"):
+            if os.path.exists(path):
+                be = lb.get_backend(find_library=lambda _n, p=path: p)
+                if be:
+                    break
+    return be
+
+
 class UDMXDevice:
     def __init__(self):
         self.dev = None
@@ -29,7 +44,11 @@ class UDMXDevice:
         except ImportError:
             log.error("pyusb nie je nainštalovaný (apt install python3-usb)")
             return False
-        self.dev = usb.core.find(idVendor=VID, idProduct=PID)
+        try:
+            self.dev = usb.core.find(idVendor=VID, idProduct=PID, backend=_backend())
+        except usb.core.NoBackendError:
+            log.error("libusb nenájdený (Mac: brew install libusb, Pi: apt install libusb-1.0-0)")
+            return False
         if self.dev is None:
             return False
         try:

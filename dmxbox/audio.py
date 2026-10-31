@@ -79,6 +79,41 @@ def parec_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
         time.sleep(1)
 
 
+def list_inputs() -> list[str]:
+    """Vstupné zvukové zariadenia (sounddevice) – na Mac/PC."""
+    import sounddevice as sd
+    return [f"{i}: {d['name']} ({d['max_input_channels']} ch)"
+            for i, d in enumerate(sd.query_devices()) if d["max_input_channels"] > 0]
+
+
+def device_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
+    """Bloky zo zvukového vstupu cez sounddevice, napr. 'BlackHole 2ch' na Macu.
+
+    Na Pi sa nepoužíva (tam parec monitor), slúži na testy na Macu/PC.
+    """
+    import queue
+
+    import sounddevice as sd
+    dev: str | int = int(device) if device.isdigit() else device
+    info = sd.query_devices(dev, "input")
+    ch = max(1, min(2, int(info["max_input_channels"])))
+    q: queue.Queue[np.ndarray] = queue.Queue(maxsize=64)
+
+    def cb(indata, frames, _time, status):  # noqa: ANN001
+        if status:
+            log.debug("audio status: %s", status)
+        try:
+            q.put_nowait(indata.mean(axis=1).astype(np.float32).copy())
+        except queue.Full:
+            pass
+
+    log.info("audio: %s, %d ch, %d Hz", info["name"], ch, rate)
+    with sd.InputStream(device=dev, channels=ch, samplerate=rate, blocksize=hop,
+                        dtype="float32", callback=cb):
+        while True:
+            yield q.get()
+
+
 # --- analyzátor ---------------------------------------------------------------
 
 class Envelope:

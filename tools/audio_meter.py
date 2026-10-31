@@ -3,6 +3,7 @@
 
   python3 tools/audio_meter.py            # monitor predvoleného výstupu (parec)
   python3 tools/audio_meter.py --sim 140  # syntetická hudba
+  python3 tools/audio_meter.py --input "BlackHole 2ch"   # Mac
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from dmxbox.audio import Analyzer, parec_source  # noqa: E402
+from dmxbox.audio import Analyzer, device_source, list_inputs, parec_source  # noqa: E402
 from dmxbox.config import load_config  # noqa: E402
 from dmxbox.sim import synth_source  # noqa: E402
 
@@ -28,10 +29,19 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sim", type=float, default=None, metavar="BPM")
     ap.add_argument("--source", default=None, help="parec zariadenie (predvolene z config.yaml)")
+    ap.add_argument("--input", default=None, help="sounddevice vstup (Mac/PC), napr. 'BlackHole 2ch'")
+    ap.add_argument("--list-inputs", action="store_true")
     a = ap.parse_args()
+    if a.list_inputs:
+        print("\n".join(list_inputs()))
+        return
     ac = load_config()["audio"]
-    src = (synth_source(bpm=a.sim, rate=ac["rate"], hop=ac["hop"]) if a.sim
-           else parec_source(a.source or ac["source"], ac["rate"], ac["hop"]))
+    if a.sim:
+        src = synth_source(bpm=a.sim, rate=ac["rate"], hop=ac["hop"])
+    elif a.input:
+        src = device_source(a.input, ac["rate"], ac["hop"])
+    else:
+        src = parec_source(a.source or ac["source"], ac["rate"], ac["hop"])
     an = Analyzer(src, rate=ac["rate"], hop=ac["hop"], fft=ac["fft"], bpm_min=ac["bpm_min"],
                   bpm_max=ac["bpm_max"], silence_seconds=ac["silence_seconds"], realtime=bool(a.sim))
     an.start()

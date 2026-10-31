@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import uvicorn
 
 from .api import create_app
-from .audio import Analyzer, parec_source
+from .audio import Analyzer, device_source, list_inputs, parec_source
 from .audio_ctl import LineIn
 from .config import load_config, resolve
 from .dmx_out import DMXOut
@@ -32,11 +32,14 @@ class Box:
     line_in: LineIn
 
 
-def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False) -> Box:
+def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
+          input_device: str | None = None) -> Box:
     ac, dc = cfg["audio"], cfg["dmx"]
     rig = load_rig(cfg["fixtures_file"])
     if sim_bpm:
         source = synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], silence_every=60)
+    elif input_device:
+        source = device_source(input_device, ac["rate"], ac["hop"])
     else:
         source = parec_source(ac["source"], ac["rate"], ac["hop"])
     analyzer = Analyzer(source, rate=ac["rate"], hop=ac["hop"], fft=ac["fft"],
@@ -57,14 +60,20 @@ def main() -> None:
     ap.add_argument("--sim", type=float, nargs="?", const=124.0, default=None,
                     metavar="BPM", help="simulovaná hudba (predvolene 124 BPM)")
     ap.add_argument("--dry", action="store_true", help="DMX naprázdno (bez USB)")
+    ap.add_argument("--input", default=None, metavar="ZARIADENIE",
+                    help="zvukový vstup cez sounddevice (Mac/PC), napr. 'BlackHole 2ch'")
+    ap.add_argument("--list-inputs", action="store_true", help="vypíše zvukové vstupy a skončí")
     ap.add_argument("--port", type=int, default=None)
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+    if args.list_inputs:
+        print("\n".join(list_inputs()))
+        return
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
-    box = build(cfg, sim_bpm=args.sim, dry=args.dry)
+    box = build(cfg, sim_bpm=args.sim, dry=args.dry, input_device=args.input)
     box.out.start()
     box.analyzer.start()
     box.engine.start()
