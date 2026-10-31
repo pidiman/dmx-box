@@ -7,16 +7,18 @@ Samostatná krabička na **Raspberry Pi 3B+** inšpirovaná ADJ myDMX GO. Prijí
 - **Bez mikrofónu:** box je v audio reťazci a analyzuje presne ten signál, ktorý hrá.
 - **Vstupy:** Bluetooth A2DP, Spotify Connect, voliteľne AirPlay a line-in (UCA202).
 - **Výstup zvuku:** UCA202 → AUX-in reproduktora (latencia ~10–20 ms, sync bez kalibrácie).
-- **DMX:** OLA → Lixada USB-DMX (uDMX) → XLR → wireless TX → RX pri svetlách.
+- **DMX:** priamy uDMX výstup cez pyusb (32 kanálov po 8) → Lixada USB-DMX → XLR → wireless TX → RX pri svetlách.
 - **Mozog:** Python aplikácia `dmxbox` (aubio beat engine, FX kolesá, FastAPI + PWA).
 
 ## Svetlá
 
 | Svetlo | Mód | DMX adresa |
 | --- | --- | --- |
-| MAX LED Parbar 4-way 3× 4-in-1 RGBW | doplniť | 1 |
-| Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH | 9 |
-| Light4Me BELKA Laser Strobe LED PAR Derby UV | doplniť | doplniť |
+| MAX PartyBar4 (LED Parbar 4-way 3× 4-in-1 RGBW) | 8CH | 1 (1–8) |
+| Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH, `SL 1` | 9 (9–20) |
+| Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (21–32) |
+
+Kanálové mapy: [`fixtures.yaml`](fixtures.yaml).
 
 ## Dokumentácia
 
@@ -33,4 +35,4 @@ Kompletný popis projektu je v [docs/PROJEKT.md](docs/PROJEKT.md):
 
 ## Stav
 
-Fáza návrhu. Ďalší krok: M0 (Pi + OS) a doplnenie kanálových tabuliek svetiel.
+Fáza návrhu. Kanálové mapy svetiel sú hotové. Ďalší krok: M0 (Pi + OS) a kostra kódu.

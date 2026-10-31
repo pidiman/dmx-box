@@ -21,9 +21,11 @@ Rozdiel oproti myDMX GO: krabička sama počúva hudbu a svetlá hýbe v tempe b
 
 | Svetlo | Mód | DMX adresa |
 | --- | --- | --- |
-| MAX LED Parbar 4-way 3× 4-in-1 RGBW | treba doplniť | 1 |
-| Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH | 9 |
-| Light4Me BELKA Laser Strobe LED PAR Derby UV | treba doplniť | treba doplniť |
+| MAX PartyBar4 (LED Parbar 4-way 3× 4-in-1 RGBW) | 8CH | 1 (kanály 1–8) |
+| Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH, `SLnd → SL 1` | 9 (kanály 9–20) |
+| Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (kanály 21–32) |
+
+Kompletné kanálové mapy sú v [`fixtures.yaml`](../fixtures.yaml). Zmapované boli naživo v októbri 2026.
 
 ## Architektúra a tok signálu
 
@@ -209,7 +211,19 @@ Presné názvy zariadení sa overia cez `pactl list short sinks` a `pactl list s
 
 ## DMX výstup
 
-DMX posiela OLA (`olad`) cez uDMX plugin do univerza 1. Aplikácia mu posiela 512-bajtový buffer 40× za sekundu.
+**Zmena oproti pôvodnému návrhu:** Lixada je uDMX klon (`16c0:05dc`), ktorý **neznesie celý univerz naraz**. QLC+ uDMX plugin s ním padal na USB I/O chybách a 512 kanálov pri 40 fps rozbíjalo aj wireless link (jitter, nereagujúce svetlá). Funguje len **32 kanálov posielaných po 8** cez USB control transfer (`bmRequestType=0x40`, `bRequest=2`, SetChannelRange). OLA uDMX plugin pravdepodobne narazí na rovnaký problém.
+
+Preto `dmxbox` posiela DMX **priamo cez pyusb** (modul `dmx_out.py`), 32 kanálov po 8, s auto-reconnectom. OLA je voliteľná, len ak bude treba Art-Net vstup.
+
+```python
+# jadro uDMX výstupu (pyusb)
+dev = usb.core.find(idVendor=0x16c0, idProduct=0x05dc)
+for start in range(0, 32, 8):
+    chunk = bytes(frame[start:start + 8])
+    dev.ctrl_transfer(0x40, 2, len(chunk), start, chunk, timeout=100)
+```
+
+Pôvodný plán s OLA (ak by plugin s týmto donglom fungoval):
 
 1. udev pravidlo pre uDMX klon:
 
@@ -230,7 +244,7 @@ ola_set_dmx -u 1 -d 255,0,0,0     # test: prvé kanály parbaru
 
 Web OLA beží na `http://dmx-box.local:9090`, hodí sa na kontrolu kanálov.
 
-3. **Art-Net vstup** ostane zapnutý. ENTTEC EMU z Macu alebo QLC+ z PC môže poslať Art-Net do toho istého boxu a obísť vlastný engine.
+3. **Art-Net vstup** (len s OLA, voliteľne) ostane zapnutý. ENTTEC EMU z Macu alebo QLC+ z PC môže poslať Art-Net do toho istého boxu a obísť vlastný engine.
 4. **Ak by `lsusb` ukázalo `0403:6001`** (FTDI), použije sa plugin `ftdidmx` namiesto uDMX. Zvyšok sa nemení.
 
 **Záloha s ESP32:** ak lacný uDMX klon spôsobí blikanie moving headu (nepresné časovanie), ESP32 + MAX485 s knižnicou `esp_dmx` bude DMX výstup a Pi mu pošle Art-Net cez Ethernet alebo Wi-Fi. Zatiaľ to netreba.
@@ -246,7 +260,8 @@ Jeden Python proces s tromi súbežnými časťami: audio analýza, engine (40 H
 | `audio.py` | číta `parec` stream, počíta BPM, fázu beatu, onsety a pásma |
 | `fixtures.py` + `fixtures.yaml` | kanálové mapy svetiel, preklad „farba / pan / tilt / dimmer“ na DMX kanály |
 | `effects/` | jednotlivé FX ako malé funkcie: vstup = audio stav + čas, výstup = hodnoty pre svetlá |
-| `engine.py` | 40 Hz slučka, skladá vrstvy FX, aplikuje master a light delay, posiela do OLA |
+| `engine.py` | 40 Hz slučka, skladá vrstvy FX, aplikuje master a light delay |
+| `dmx_out.py` | uDMX výstup cez pyusb, 32 kanálov po 8, auto-reconnect |
 | `api.py` | FastAPI: REST príkazy, WebSocket so stavom, servuje PWA |
 | `state.py` | aktuálny režim, vybrané FX, presety v `presets.json` |
 | `config.yaml` | výstup (cable/bluetooth), light delay, názvy audio zariadení, OLA univerz |
@@ -275,25 +290,23 @@ class AudioState:
     silent: bool
 ```
 
-**fixtures.yaml** (návrh, kanály sa doplňia z manuálov):
+**fixtures.yaml** (skrátene, celé v [`fixtures.yaml`](../fixtures.yaml)):
 
 ```yaml
 fixtures:
-  parbar:
+  parbar:        # MAX PartyBar4, 8CH, d001 – celá lišta jedna farba
     start: 1
-    type: rgbw_segments
-    segments: 4            # 4 hlavy
-    channels: {}           # doplniť: dimmer, strobe, R,G,B,W na segment
-  movinghead:
+    channels: {macro: 1, color_macro: 2, speed: 3, dimmer: 4, red: 5, green: 6, blue: 7, white: 8}
+  movinghead:    # Fractal Mini LED Gobo Spot 30W, 12CH, A009
     start: 9
-    type: moving_head
-    mode: 12ch
-    channels: {}           # doplniť: pan, pan_fine, tilt, tilt_fine, speed, dimmer, strobe, color, gobo...
-    limits: {pan: [0, 255], tilt: [40, 200]}   # aby nesvietil do očí / do stropu
-  derby:
-    start: null            # doplniť adresu
-    type: effect
-    channels: {}
+    channels: {pan: 1, pan_fine: 2, tilt: 3, tilt_fine: 4, color: 5, gobo: 6,
+               strobe: 7, dimmer: 8, pt_speed: 9, program: 10, reset: 11, led_ring: 12}
+    limits: {pan: [0, 255], tilt: [40, 200]}
+  belka:         # Light4Me BELKA, 12CH, d021 – bez UV kanála
+    start: 21
+    channels: {derby_red: 1, derby_green: 2, derby_blue: 3, derby_white: 4, derby_motor: 5,
+               par_red: 6, par_green: 7, par_blue: 8, par_white: 9,
+               laser: 10, strobe: 11, strobe_speed: 12}
 ```
 
 **Engine a vrstvy** (`engine.py`)
@@ -307,15 +320,22 @@ Každý frame (25 ms) sa skladá v tomto poradí. Vyššia vrstva prepíše niž
 5. FX koleso 2: pohyb (moving head)
 6. Master dimmer a light delay (oneskorenie celého výstupu o N ms cez ring buffer)
 
+**Poznatky z predošlých pokusov** (QLC+, `partybar.py`, `dmx_hudba.py`):
+
+- Parbar má jednu farbu pre celú lištu, chase medzi parmi cez DMX nejde. Efekty „po paroch“ vedia len jeho vstavané makrá (kanál 1).
+- Motor moving headu nestíha plynulé kruhy v tempe. Lepšie funguje **pohyb skokmi** medzi ~10 pozíciami v miestnosti na beat.
+- Beat detekcia cez energiu (prah hlasitosti) bola nespoľahlivá. Funguje **spectral flux onset** v pásme 40–160 Hz s adaptívnym prahom.
+- Osvedčili sa **štýly podľa žánru** (DnB, house, techno, hip-hop, chill) s automatickou voľbou podľa BPM.
+
 **FX koleso 1: farby** (8 efektov, prvý návrh)
 
 | FX | Správanie |
 | --- | --- |
-| Beat chase | každý beat sa rozsvieti ďalšia hlava parbaru |
+| Beat chase | každý beat iná farba: parbar, PAR a derby na Belke sa striedajú |
 | Bass pump | jas celého parbaru poduľa bass obálky |
 | Color step | každý takt nová farba z palety |
 | Rainbow drift | pomalý prechod farieb, rýchlosť z BPM |
-| Split L/R | ľavá a pravá polovica striedavo na beat |
+| Split | parbar a Belka PAR striedavo na beat |
 | Kick flash | biely záblesk na onset, inak tlmená farba |
 | Build-up | stupňujúce sa blikanie pri rástúcom high, drop = strobe |
 | Derby sync | derby motor a farby zapínané na refrénoch (vysoký level) |
@@ -324,8 +344,8 @@ Každý frame (25 ms) sa skladá v tomto poradí. Vyššia vrstva prepíše niž
 
 | FX | Správanie |
 | --- | --- |
-| Circle | kruh, jedna otáčka za 1, 2 alebo 4 takty |
-| Figure 8 | osmička v tempe |
+| Jump | skok na ďalšiu z ~10 pozícií na každý beat (hlavný režim) |
+| Circle slow | pomalý kruh cez 4–8 taktov (len pri chill tempe) |
 | Sweep | pan zo strany na stranu na beat |
 | Tilt bounce | tilt hore-dole na beat |
 | Snap | skáče na náhodné pozície na každý 2. beat |
@@ -475,7 +495,8 @@ Každý míľnik má jasný test. Ďalší sa začína, až keď predošlý prej
 | --- | --- | --- |
 | Rušenie v 2,4 GHz | svetlá zamrzú, BT audio vypadáva | Wi-Fi na 5 GHz, DMX TX na vzdialený kanál, box bližšie k mobilu |
 | Slabý zdroj | USB zariadenia odpadávajú, `throttled` ≠ 0x0 | oficiálny zdroj 2,5 A, krátky kvalitný kábel |
-| uDMX klon má nepresné časovanie | moving head trhá alebo bliká | nižší refresh (30 Hz); inak ESP32 + MAX485 ako Art-Net node |
+| uDMX klon nezvláda veľké rámce | USB I/O chyby, svetlá trhajú alebo nereagujú | posielať len 32 kanálov po 8, 30–40 fps; inak ESP32 + MAX485 ako Art-Net node |
+| Wireless DMX jitter | svetlá reagujú oneskorene alebo vôbec | malé rámce (32 kanálov), test M1 najprv káblom; TX/RX na rovnakom kanáli |
 | Reproduktor nemá AUX-in | – | USB BT dongle ako druhý adaptér, výstup cez BT a light delay \~200 ms |
 | BPM detekcia sa zmýli (half/double tempo) | pohyb je 2× rýchly alebo pomalý | obmedzenie BPM na 80–170, tlačidlá ½× / 2× a Tap tempo v UI |
 | Ticho alebo hovorené slovo | svetlá náhodne blikajú | prah ticha a idle efekt |
@@ -487,10 +508,11 @@ Každý míľnik má jasný test. Ďalší sa začína, až keď predošlý prej
 
 Tieto údaje treba doplniť pred písaním `fixtures.yaml` a efektov.
 
-- [ ] Výstup `lsusb` s Lixada: uDMX (`16c0:05dc`) alebo FTDI (`0403:6001`)?
-- [ ] MAX Parbar: DMX mód (počet kanálov) a kanálová tabuľka.
-- [ ] Fractal Mini LED Gobo Spot 30W: tabuľka 12CH módu (pan, tilt, fine, speed, dimmer, strobe, color, gobo, reset…).
-- [ ] Light4Me BELKA Derby: DMX mód, adresa a kanálová tabuľka.
+- [x] Lixada: uDMX klon (`16c0:05dc`), vyžaduje posielanie po 8 kanáloch.
+- [x] MAX PartyBar4: 8CH, d001, tabuľka v `fixtures.yaml`.
+- [x] Fractal Mini LED Gobo Spot 30W: 12CH, A009, `SL 1`, tabuľka v `fixtures.yaml`.
+- [x] Light4Me BELKA: 12CH, d021, tabuľka v `fixtures.yaml`.
+- [ ] Overiť naživo: parbar kanály 2–3, spot strobo/rýchlosť/program, rozsahy lasera Belky.
 - [ ] Model reproduktora: má AUX-in?
 - [ ] Zariadenia, z ktorých sa bude hrať: iOS, Android alebo oboje (treba AirPlay?).
 - [ ] Kúpiť UCA202, microSD a zdroj.
