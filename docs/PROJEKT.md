@@ -23,7 +23,7 @@ Rozdiel oproti myDMX GO: krabička sama počúva hudbu a svetlá hýbe v tempe b
 | --- | --- | --- |
 | MAX PartyBar4 (LED Parbar 4-way 3× 4-in-1 RGBW) | 8CH | 1 (kanály 1–8) |
 | Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH, `SLnd → SL 1` | 9 (kanály 9–20) |
-| Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH (UV kanál zatiaľ nenájdený) | 21 (kanály 21–32) |
+| Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (kanály 21–32) |
 
 Kompletné kanálové mapy sú v [`fixtures.yaml`](../fixtures.yaml). Zmapované boli naživo v októbri 2026.
 
@@ -302,11 +302,11 @@ fixtures:
     channels: {pan: 1, pan_fine: 2, tilt: 3, tilt_fine: 4, color: 5, gobo: 6,
                strobe: 7, dimmer: 8, pt_speed: 9, program: 10, reset: 11, led_ring: 12}
     limits: {pan: [0, 255], tilt: [40, 200]}
-  belka:         # Light4Me BELKA, 12CH, d021 – má UV aj strobo, UV kanál treba overiť
+  belka:         # Light4Me BELKA, 12CH, d021 – strobo a UV sú jeden modul (11 jas, 12 rýchlosť)
     start: 21
     channels: {derby_red: 1, derby_green: 2, derby_blue: 3, derby_white: 4, derby_motor: 5,
                par_red: 6, par_green: 7, par_blue: 8, par_white: 9,
-               laser: 10, strobe: 11, strobe_speed: 12, uv: null}
+               laser: 10, strobe_uv: 11, strobe_speed: 12}
 ```
 
 **Engine a vrstvy** (`engine.py`)
@@ -512,7 +512,7 @@ Tieto údaje treba doplniť pred písaním `fixtures.yaml` a efektov.
 - [x] MAX PartyBar4: 8CH, d001, tabuľka v `fixtures.yaml`.
 - [x] Fractal Mini LED Gobo Spot 30W: 12CH, A009, `SL 1`, tabuľka v `fixtures.yaml`.
 - [x] Light4Me BELKA: 12CH, d021, tabuľka v `fixtures.yaml`.
-- [ ] Belka UV: nájsť, ktorý kanál/rozsah zapína UV (rozsahy na kanáloch 11/12, iný DMX mód v menu lišty, alebo len vstavané programy).
+- [ ] Belka: overiť, že kanál 11 pri kanáli 12 = 0 svieti stále (UV), a pri 12 > 0 bliká (strobo).
 - [ ] Overiť naživo: parbar kanály 2–3, spot strobo/rýchlosť/program, rozsahy lasera Belky.
 - [ ] Model reproduktora: má AUX-in?
 - [ ] Zariadenia, z ktorých sa bude hrať: iOS, Android alebo oboje (treba AirPlay?).

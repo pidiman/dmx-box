@@ -76,9 +76,8 @@ fixtures:
     start: 21           # displej d021
     mode: 12ch
     footprint: 12
-    # Má UV LED aj biele strobo. V teste 25. 10. sa UV na žiadnom z 12 kanálov
-    # samostatne neprejavilo → UV kanál treba nájsť (iný rozsah na 11/12,
-    # iný DMX mód lišty, alebo UV len vo vstavaných programoch).
+    # Strobo a UV sú jedno svetlo (jeden LED modul): kanál 11 = jas modulu,
+    # kanál 12 = rýchlosť blikania. Stály UV = 11 > 0 a 12 = 0, strobo = 11 + 12 > 0.
     channels:
       derby_red: 1
       derby_green: 2
@@ -90,16 +89,16 @@ fixtures:
       par_blue: 8
       par_white: 9
       laser: 10         # 0–63 vyp | 64–127 červený | 128–197 zelený | 198–255 oba
-      strobe: 11        # jas stroba (podľa testu; možno zdieľa UV – overiť)
-      strobe_speed: 12  # rýchlosť stroba
-      uv: null          # TODO: overiť naživo
+      strobe_uv: 11     # jas strobo/UV modulu
+      strobe_speed: 12  # rýchlosť blikania (0 = svieti stále)
     ranges:
       laser:
         off: [0, 63]
         red: [64, 127]
         green: [128, 197]
         both: [198, 255]
-    verified: partial   # belka-test 25. 10. 2026; UV chýba, rozsahy lasera podľa manuálu
+    verified: live      # belka-test 25. 10. 2026; rozsahy lasera podľa manuálu
+                        # overiť: či pri 12 = 0 modul svieti stále (UV)
 
 # Spolu kanály 1–32. Posielať len 32 kanálov, nie celý univerz (viď docs/PROJEKT.md, DMX výstup).
 universe_channels: 32
