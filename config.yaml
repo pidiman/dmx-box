@@ -1,0 +1,28 @@
+# DMX-BOX – runtime konfigurácia
+
+audio:
+  # PipeWire/Pulse zdroj pre parec. "auto" = monitor predvoleného výstupu.
+  source: auto
+  rate: 44100
+  hop: 512             # ~11,6 ms na blok
+  fft: 1024
+  bpm_min: 80
+  bpm_max: 180
+  silence_seconds: 4   # po koľkých sekundách ticha ísť do idle
+
+dmx:
+  driver: udmx         # udmx | dry
+  fps: 40
+  channels: 32         # posielať len 32 kanálov (uDMX klon nezvláda viac)
+  chunk: 8             # po koľko kanálov v jednom USB transfere
+
+output:
+  mode: cable          # cable | bluetooth
+  light_delay_ms: 0    # pri bluetooth reproduktore ~200
+
+web:
+  host: 0.0.0.0
+  port: 80           # install.sh povolí port 80 bez roota (sysctl)
+
+presets_file: presets.json
+fixtures_file: fixtures.yaml

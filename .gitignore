@@ -6,3 +6,4 @@ venv/
 presets.json
 *.log
 .DS_Store
+.pytest_cache/

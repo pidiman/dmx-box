@@ -151,7 +151,7 @@ Všetky vstupy idú do jedného PipeWire sinku (UCA202 výstup). Analyzátor č�
 | Vstup | Pre koho | Poznámka |
 | --- | --- | --- |
 | Bluetooth A2DP | akýkoľvek mobil/tablet, akákoľvek appka | onboard BT, box sa označí ako „DMX-BOX“ |
-| Spotify Connect | Spotify na Android aj iOS | `raspotify`, hrá cez Wi-Fi, lepší dosah aj kvalita |
+| Spotify Connect | Spotify na Android aj iOS | `librespot` ako user služba, hrá cez Wi-Fi, lepší dosah aj kvalita |
 | AirPlay | iPhone/iPad, všetky appky | `shairport-sync`, len ak bude treba |
 | Line-in | DJ mixér, PC | UCA202 INPUT + PipeWire loopback, prepínač v UI |
 
@@ -182,13 +182,14 @@ pairable on
 EOF
 ```
 
-WirePlumber s `libspa-0.2-bluetooth` vytvorí A2DP sink automaticky. Stream z mobilu sa napojí na predvolený výstup, teda UCA202. Agent bude v produkcii bežať ako malá systemd služba (`bt-agent.service`).
+WirePlumber s `libspa-0.2-bluetooth` vytvorí A2DP sink automaticky. Stream z mobilu sa napojí na predvolený výstup, teda UCA202. V produkcii beží `bt-agent -c NoInputNoOutput` (balík `bluez-tools`) ako systémová služba `bt-agent.service`.
 
 **Spotify Connect:**
 
 ```bash
-curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
-# /etc/raspotify/conf: LIBRESPOT_NAME="DMX-BOX", LIBRESPOT_BACKEND="pulseaudio", LIBRESPOT_BITRATE="320"
+# ./install.sh --spotify: nainštaluje raspotify (kvôli binárke librespot),
+# vypne jeho systémovú službu (nevidí user PipeWire) a spustí user službu:
+systemctl --user enable --now librespot   # systemd/librespot.service
 ```
 
 **Line-in loopback** (zapína a vypína ho appka):
@@ -373,7 +374,7 @@ Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu
 - Presety 1–50 v mriežke, dlhý stlak = uložiť.
 - Nastavenia: light delay, line-in on/off, prah ticha, fixtures (adresy).
 
-**API** (FastAPI, port 80 cez `CAP_NET_BIND_SERVICE` alebo 8080 + presmerovanie)
+**API** (FastAPI na porte 80; `install.sh` nastaví `net.ipv4.ip_unprivileged_port_start=80`, takže user služba nepotrebuje root)
 
 | Metóda | Cesta | Telo / význam |
 | --- | --- | --- |
@@ -419,59 +420,59 @@ sudo nmcli con add type wifi ifname wlan0 con-name dmx-hotspot ssid DMX-BOX \
 
 ## Repo, služby a nasadenie
 
-Kód bude v repe `pidiman/dmx-box` na GitHube. Na Pi sa klonuje do `/opt/dmx-box` a inštaluje jedným skriptom.
+Kód je v repe [`pidiman/dmx-box`](https://github.com/pidiman/dmx-box). Na Pi sa klonuje do `~/dmx-box` a inštaluje jedným skriptom.
 
 ```text
 dmx-box/
-├── install.sh              # balíky, udev, OLA config, BT config, systemd, hotspot
-├── config.yaml             # výstup, light delay, audio zariadenia, univerz
+├── install.sh              # balíky, udev, BT, port 80, hotspot, systemd (voliteľne Spotify)
+├── config.yaml             # audio, DMX (32 kanálov po 8), light delay, web port
 ├── fixtures.yaml           # kanálové mapy svetiel
+├── requirements.txt
 ├── dmxbox/
-│   ├── main.py             # štart: audio vlákno, engine vlákno, uvicorn
-│   ├── audio.py
-│   ├── engine.py
-│   ├── fixtures.py
-│   ├── state.py
-│   ├── api.py
+│   ├── main.py             # štart: DMX vlákno, audio vlákno, engine, uvicorn
+│   ├── config.py
+│   ├── fixtures.py         # Rig + zápis logických kanálov do DMX rámca
+│   ├── dmx_out.py          # uDMX cez pyusb, light delay, auto-reconnect
+│   ├── audio.py            # parec → pásma, onsety, BPM, fáza beatu (len numpy)
+│   ├── audio_ctl.py        # line-in loopback cez pactl
+│   ├── sim.py              # syntetická hudba na testy
+│   ├── state.py            # nastavenia z UI + presety
+│   ├── engine.py           # 40 Hz slučka, vrstvy, auto mód, Look → DMX
+│   ├── api.py              # FastAPI REST + WebSocket + PWA
 │   └── effects/
-│       ├── color.py        # FX koleso 1
+│       ├── color.py        # FX koleso 1 + palety
 │       └── movement.py     # FX koleso 2
-├── web/                    # index.html, app.js, style.css, manifest.json, sw.js
+├── web/                    # PWA: index.html, app.js, style.css, manifest.json, sw.js, icon.svg
 ├── systemd/
-│   ├── dmxbox.service
-│   ├── bt-agent.service
+│   ├── dmxbox.service      # user služba
+│   ├── librespot.service   # user služba (Spotify Connect)
+│   ├── bt-agent.service    # systémová
 │   └── wifi-fallback.service
-└── tools/
-    ├── dmx_test.py         # rozsvieti jednotlivé kanály, test fixtures.yaml
-    └── audio_meter.py      # vypíše BPM a VU v termináli
+├── scripts/wifi-fallback.sh
+├── tools/
+│   ├── dmx_test.py         # raw / walk / sweep kanálov podľa fixtures.yaml
+│   └── audio_meter.py      # BPM, beat a pásma v termináli
+└── tests/test_dmxbox.py    # pytest bez hardvéru
 ```
 
-**dmxbox.service** (user služba, aby videla PipeWire):
-
-```ini
-[Unit]
-Description=DMX-BOX engine
-After=pipewire.service wireplumber.service
-
-[Service]
-WorkingDirectory=/opt/dmx-box
-ExecStart=/usr/bin/python3 -m dmxbox.main
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=default.target
-```
+**Inštalácia na Pi:**
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp systemd/dmxbox.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now dmxbox
+git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
+./install.sh --hotspot-pass 'tajne-heslo' --spotify
+sudo reboot
+```
+
+**Spustenie a logy:**
+
+```bash
+systemctl --user start dmxbox
 journalctl --user -u dmxbox -f
 ```
 
-**Aktualizácia:** `cd /opt/dmx-box && git pull && systemctl --user restart dmxbox`. Vývoj môžeš robiť v Claude Code na PC, push na GitHub a pull na Pi, rovnako ako pri ostatných projektoch.
+**Vývoj bez hardvéru** (PC/Mac): `python3 -m dmxbox.main --sim 128 --dry --port 8080` a otvor `http://localhost:8080`. Testy: `python3 -m pytest -q tests`.
+
+**Aktualizácia:** `cd ~/dmx-box && git pull && systemctl --user restart dmxbox`. Vývoj môžeš robiť v Claude Code na PC, push na GitHub a pull na Pi, rovnako ako pri ostatných projektoch.
 
 ## Míľniky
 
@@ -480,7 +481,7 @@ Každý míľnik má jasný test. Ďalší sa začína, až keď predošlý prej
 - [ ] **M0 – Pi a OS:** `ssh dmx-box.local` funguje, `vcgencmd get_throttled` = `0x0`, `lsusb` vidí Lixada aj UCA202.
 - [ ] **M1 – DMX káblom:** `ola_set_dmx -u 1 -d 255,0,0,0` rozsvieti parbar pri priamom XLR kábli.
 - [ ] **M2 – Wireless DMX:** to isté cez TX/RX, 5 minút bez výpadku pri zapnutej Wi-Fi aj BT.
-- [ ] **M3 – Fixtures:** `tools/dmx_test.py` ovláda každý kanál všetkých troch svetiel podľa `fixtures.yaml`.
+- [ ] **M3 – Fixtures:** `python3 tools/dmx_test.py walk all --log test.txt` prejde každý kanál všetkých troch svetiel podľa `fixtures.yaml`.
 - [ ] **M4 – Audio prehrávanie:** mobil cez BT hrá do boxu a zvuk ide z reproduktora cez AUX. Spotify Connect vidí „DMX-BOX“.
 - [ ] **M5 – Analýza:** `tools/audio_meter.py` ukazuje BPM, ktoré sedí so skladbou (±2 BPM), a VU reaguje na bass.
 - [ ] **M6 – Engine v1:** jeden farebný FX (Beat chase) a jeden pohybový (Circle) bežia v tempe.

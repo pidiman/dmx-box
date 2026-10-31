@@ -1,0 +1,16 @@
+# systémová služba: mobil sa spáruje s DMX-BOX bez PIN-u
+[Unit]
+Description=Bluetooth agent (NoInputNoOutput) pre DMX-BOX
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+ExecStartPre=/usr/bin/bluetoothctl power on
+ExecStartPre=/usr/bin/bluetoothctl discoverable on
+ExecStartPre=/usr/bin/bluetoothctl pairable on
+ExecStart=/usr/bin/bt-agent -c NoInputNoOutput
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

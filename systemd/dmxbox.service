@@ -1,0 +1,15 @@
+# user služba (~/.config/systemd/user/), aby videla PipeWire používateľa
+[Unit]
+Description=DMX-BOX engine
+After=pipewire.service pipewire-pulse.service wireplumber.service
+Wants=pipewire-pulse.service
+
+[Service]
+WorkingDirectory=%h/dmx-box
+ExecStart=/usr/bin/python3 -m dmxbox.main
+Restart=always
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

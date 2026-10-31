@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0b12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DMX-BOX</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="bpm">
+      <span id="beat" class="dot"></span>
+      <strong id="bpm">---</strong><small>BPM</small>
+    </div>
+    <div class="vu">
+      <div><i id="vu-bass"></i><span>B</span></div>
+      <div><i id="vu-mid"></i><span>M</span></div>
+      <div><i id="vu-high"></i><span>H</span></div>
+    </div>
+    <div class="status"><span id="conn" class="pill off">offline</span><span id="dmx" class="pill">DMX</span></div>
+  </header>
+
+  <main>
+    <section class="wheels">
+      <div class="wheel-box">
+        <h2>Farby <em id="cur-color"></em></h2>
+        <div class="wheel" id="wheel-color"></div>
+      </div>
+      <div class="wheel-box">
+        <h2>Pohyb <em id="cur-move"></em></h2>
+        <div class="wheel" id="wheel-move"></div>
+      </div>
+    </section>
+
+    <section class="row tempo">
+      <button id="auto" class="toggle">AUTO</button>
+      <select id="auto-bars" aria-label="Takty pre auto">
+        <option value="8">8 taktov</option><option value="16">16 taktov</option><option value="32">32 taktov</option>
+      </select>
+      <button data-bpm="0.5">½×</button>
+      <button data-bpm="2">2×</button>
+      <button id="tap">TAP</button>
+      <button id="bpm-auto" title="Späť na automatické BPM">A</button>
+    </section>
+
+    <section class="hold">
+      <button id="strobe" class="big strobe">STROBO</button>
+      <button id="blackout" class="big black toggle">BLACKOUT</button>
+    </section>
+
+    <section class="sliders">
+      <label>Master <input type="range" id="master" min="0" max="1" step="0.01"></label>
+      <label>Veľkosť <input type="range" id="size" min="0" max="1" step="0.01"></label>
+      <label>Mäkkosť <input type="range" id="fade" min="0" max="1" step="0.01"></label>
+      <div class="seg" id="speed">
+        <span>Rýchlosť</span>
+        <button data-v="0.5">½×</button><button data-v="1">1×</button><button data-v="2">2×</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Paleta</h2>
+      <div class="chips" id="palettes"></div>
+      <div class="row manual">
+        <label class="picker">Vlastná farba <input type="color" id="manual" value="#ff0040"></label>
+        <button id="manual-off">Zrušiť</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Presety <small>ťuk = načítať, podrž = uložiť</small></h2>
+      <div class="presets" id="presets"></div>
+    </section>
+
+    <details class="settings">
+      <summary>Nastavenia</summary>
+      <label>Light delay <output id="delay-out">0 ms</output>
+        <input type="range" id="delay" min="0" max="500" step="10"></label>
+      <label class="check"><input type="checkbox" id="laser"> Laser</label>
+      <label class="check"><input type="checkbox" id="uv"> UV podklad (Belka)</label>
+      <label class="check"><input type="checkbox" id="line_in"> Line-in (UCA202 IN)</label>
+    </details>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>

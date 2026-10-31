@@ -33,6 +33,28 @@ Kompletný popis projektu je v [docs/PROJEKT.md](docs/PROJEKT.md):
 - web UI a API, sieť (5 GHz, hotspot fallback)
 - míľniky, riziká, otvorené otázky
 
+## Rýchly štart
+
+Na Raspberry Pi 3B+ (Raspberry Pi OS Lite 64-bit):
+
+```bash
+git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
+./install.sh --hotspot-pass 'tajne-heslo' --spotify
+sudo reboot
+```
+
+Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku).
+
+Bez hardvéru (vývoj na PC/Mac):
+
+```bash
+pip install -r requirements.txt
+python3 -m dmxbox.main --sim 128 --dry --port 8080   # simulovaná hudba, DMX naprázdno
+python3 -m pytest -q tests
+```
+
+Nástroje: `tools/dmx_test.py` (test kanálov), `tools/audio_meter.py` (BPM a pásma v termináli).
+
 ## Stav
 
-Fáza návrhu. Kanálové mapy svetiel sú hotové. Ďalší krok: M0 (Pi + OS) a kostra kódu.
+Kód v0.1: audio analýza, engine s 8 + 8 FX, auto mód, presety, PWA, systemd a inštalácia. Otestované bez hardvéru (simulácia, 12 testov). Ďalší krok: M0–M3 na Pi so svetlami.
