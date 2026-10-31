@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 PRESET_KEYS = ("color_fx", "move_fx", "speed", "size", "fade", "palette",
-               "master", "auto", "auto_bars", "laser", "uv")
+               "master", "auto", "auto_bars", "laser", "uv", "fog_auto")
 
 
 @dataclass
@@ -29,6 +29,9 @@ class Settings:
     manual_color: list | None = None   # [r, g, b, w] 0–1, prepíše FX
     light_delay_ms: int = 0
     line_in: bool = False
+    fog: bool = False           # drží sa tlačidlom v UI
+    fog_auto: bool = False      # auto výstrek na drop
+    fog_burst_s: float = 3.0    # dĺžka auto výstreku
 
 
 class Store:

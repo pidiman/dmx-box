@@ -19,7 +19,7 @@ DEFAULTS: dict = {
         "bpm_max": 180,
         "silence_seconds": 4,
     },
-    "dmx": {"driver": "udmx", "fps": 40, "channels": 32, "chunk": 8},
+    "dmx": {"driver": "udmx", "fps": 40, "channels": 40, "chunk": 8},
     "output": {"mode": "cable", "light_delay_ms": 0},
     "web": {"host": "0.0.0.0", "port": 80},
     "presets_file": "presets.json",

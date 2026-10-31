@@ -58,7 +58,11 @@ select { font: inherit; color: var(--text); background: var(--panel); border: 1p
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tempo #auto { min-width: 90px; }
 
-.hold { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hold { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.fogbtn { background: #14232a; border-color: #2a4a55; display: grid; place-items: center; gap: 2px; }
+.fogbtn small { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--muted); min-height: 13px; }
+.fogbtn.on { background: #d8eef5; color: #002; }
+.fogbtn.wait { opacity: .55; }
 .big { min-height: 72px; font-size: 18px; font-weight: 700; letter-spacing: .06em; border-radius: var(--radius); }
 .strobe { background: #2a2a10; border-color: #5a5a20; }
 .strobe.on, .strobe:active { background: #fff; color: #000; }

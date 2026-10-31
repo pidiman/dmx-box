@@ -18,6 +18,7 @@ from .effects import Ctx, Look, scale
 from .effects.color import COLOR_FX, PALETTES
 from .effects.movement import MOVE_FX
 from .fixtures import Rig, clamp8
+from .fog import FogController
 from .state import Store
 
 log = logging.getLogger("dmxbox.engine")
@@ -63,6 +64,7 @@ class Engine(threading.Thread):
         self._auto_bar = -1
         self._auto_i = 0
         self.last_frame = bytearray(512)
+        self.fog = FogController()
 
     def stop(self) -> None:
         self._halt.set()
@@ -100,8 +102,11 @@ class Engine(threading.Thread):
         if not s.uv and L.strobe_speed == 0:
             L.strobe_uv = 0.0
 
+        fog_on = self.fog.update(now, a, s.fog, s.fog_auto, s.fog_burst_s, s.blackout)
+
         frame = self.rig.new_frame()
         self._write(frame, L, s.master, strobe=s.strobe)
+        self._write_fog(frame, L, fog_on, s.master)
         if s.blackout:
             frame = self.rig.new_frame()
             self._write_safe_defaults(frame)
@@ -179,6 +184,16 @@ class Engine(threading.Thread):
             h.set(f, "program", 0)
             h.set(f, "reset", 0)
             h.set(f, "led_ring", 255 * L.ring)
+
+    def _write_fog(self, f: bytearray, L: Look, on: bool, master: float) -> None:
+        if "fog" not in self.rig:
+            return
+        fg = self.rig["fog"]
+        fg.set(f, "fog", 255 if on else 0)
+        # LED dymostroja svieti farbou lišty, aby bol dym farebný
+        for ch, v in zip(("red", "green", "blue"), L.bar[:3]):
+            w = L.bar[3]
+            fg.set(f, ch, 255 * min(1.0, v + w) * L.bar_dim * master)
 
     @staticmethod
     def _wheel(h, rgbw) -> int:

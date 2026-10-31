@@ -24,6 +24,9 @@ Rozdiel oproti myDMX GO: krabička sama počúva hudbu a svetlá hýbe v tempe b
 | MAX PartyBar4 (LED Parbar 4-way 3× 4-in-1 RGBW) | 8CH | 1 (kanály 1–8) |
 | Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH, `SLnd → SL 1` | 9 (kanály 9–20) |
 | Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (kanály 21–32) |
+| U'King 1200W Fog Machine (6 LED), DMX | neoverené, predpoklad 1 dym + 3 RGB | 33 (kanály 33–36) |
+
+**Dym:** tlačidlo DYM v ovládaní (ide, kým ho držíš), voliteľne auto výstrek na drop (po tichšej časti nabehne hudba naplno). Ochrana ohrievača: výstrek najviac 10 s, potom pauza 30 s; blackout dym vždy vypne. LED dymostroja svietia farbou lišty.
 
 Kompletné kanálové mapy sú v [`fixtures.yaml`](../fixtures.yaml). Zmapované boli naživo v októbri 2026.
 
@@ -513,6 +516,7 @@ Tieto údaje treba doplniť pred písaním `fixtures.yaml` a efektov.
 - [x] MAX PartyBar4: 8CH, d001, tabuľka v `fixtures.yaml`.
 - [x] Fractal Mini LED Gobo Spot 30W: 12CH, A009, `SL 1`, tabuľka v `fixtures.yaml`.
 - [x] Light4Me BELKA: 12CH, d021, tabuľka v `fixtures.yaml`.
+- [ ] U'King dymostroj: počet DMX kanálov a ich funkcie (`python3 tools/dmx_test.py walk fog`), adresa 33.
 - [ ] Belka: overiť, že kanál 11 pri kanáli 12 = 0 svieti stále (UV), a pri 12 > 0 bliká (strobo).
 - [ ] Overiť naživo: parbar kanály 2–3, spot strobo/rýchlosť/program, rozsahy lasera Belky.
 - [ ] Model reproduktora: má AUX-in?

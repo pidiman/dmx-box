@@ -7,6 +7,8 @@ let W = 0, H = 0, DPR = 1;
 let FX = {};                 // kanálové mapy z /api/fixtures
 let dmx = new Array(512).fill(0);
 let bpm = 120, silent = true;
+let haze = 0;                // 0–1 hustota dymu v miestnosti
+let puffs = [];
 
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -46,6 +48,7 @@ function glow(x, y, r, col, a) {
 
 function beam(x, y, ex, ey, w0, w1, col, a) {
   if (a <= 0.01) return;
+  a = Math.min(1, a * (0.75 + haze * 0.9));
   const ang = Math.atan2(ey - y, ex - x) + Math.PI / 2;
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const gr = g.createLinearGradient(x, y, ex, ey);
@@ -237,15 +240,44 @@ function drawBelka(t, floor) {
   label("Belka", cx, y + 34 * DPR);
 }
 
+// U'King dymostroj na zemi + opar, v ktorom sú lúče výraznejšie
+function drawFog(t, floor, dt) {
+  if (!FX.fog) return;
+  const on = ch("fog", "fog") > 10;
+  const col = [ch("fog", "red"), ch("fog", "green"), ch("fog", "blue")];
+  const lit = Math.max(...col) / 255;
+  const x = W * 0.3, y = floor - 18 * DPR;
+  haze = Math.max(0, Math.min(1, haze + (on ? dt * 0.25 : -dt * 0.015)));
+  if (on && puffs.length < 160) for (let i = 0; i < 4; i++)
+    puffs.push({ x: x + 30 * DPR, y: y, vx: (80 + Math.random() * 140) * DPR, vy: -(Math.random() * 30) * DPR, r: 8 * DPR, a: 0.5 });
+  g.globalCompositeOperation = "source-over";
+  for (const p of puffs) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.985; p.r += 26 * DPR * dt; p.a -= 0.12 * dt;
+    if (p.a > 0) glow(p.x, p.y, p.r, lit > 0.05 ? col.map((c) => 90 + c * 0.6) : [140, 140, 155], p.a * 0.35);
+  }
+  puffs = puffs.filter((p) => p.a > 0);
+  if (haze > 0.01) { g.fillStyle = rgba(150, 150, 170, haze * 0.12); g.fillRect(0, 0, W, floor); }
+  // telo dymostroja + LED
+  g.fillStyle = "#1c1c26"; g.fillRect(x - 34 * DPR, y - 14 * DPR, 64 * DPR, 30 * DPR);
+  for (let i = 0; i < 6; i++) lamp(x - 24 * DPR + i * 9 * DPR, y - 18 * DPR, 2.5 * DPR, col, lit);
+  label(on ? "Dym ●" : "Dym", x, y + 30 * DPR);
+  g.globalCompositeOperation = "lighter";
+}
+
 function label(text, x, y) {
   g.fillStyle = "#555569"; g.font = `${11 * DPR}px system-ui, sans-serif`; g.textAlign = "center";
   g.fillText(text, x, y);
 }
 
+let lastMs = 0;
 function frame(ms) {
   const t = ms / 1000;
+  const dt = Math.min(0.1, (ms - lastMs) / 1000 || 0.016);
+  lastMs = ms;
   const floor = room();
   g.globalCompositeOperation = "lighter";
+  drawFog(t, floor, dt);
+  g.globalAlpha = 1;
   drawParbar(t, floor);
   drawHead(t, floor);
   drawBelka(t, floor);
@@ -260,7 +292,7 @@ function buildPanel() {
   for (const [key, f] of Object.entries(FX))
     for (const [n, rel] of Object.entries(f.channels)) names[f.start + rel - 1] = [key, n];
   panel.innerHTML = "";
-  for (let i = 1; i <= 32; i++) {
+  for (let i = 1; i <= 36; i++) {
     const [key, n] = names[i] || ["", ""];
     const d = document.createElement("div");
     d.className = "c " + key;
@@ -271,7 +303,7 @@ function buildPanel() {
 }
 function updatePanel() {
   if (panel.classList.contains("hidden")) return;
-  for (let i = 1; i <= 32; i++) {
+  for (let i = 1; i <= 36; i++) {
     const v = dmx[i - 1] || 0;
     document.getElementById("b" + i).style.height = `${(v / 255) * 100}%`;
     document.getElementById("v" + i).textContent = v;

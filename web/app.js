@@ -107,7 +107,8 @@ function apply(s) {
   $("#auto").classList.toggle("on", s.auto);
   $("#auto-bars").value = String(s.auto_bars);
   $("#blackout").classList.toggle("on", s.blackout);
-  for (const id of ["laser", "uv", "line_in"]) $("#" + id).checked = !!s[id];
+  for (const id of ["laser", "uv", "line_in", "fog_auto"]) $("#" + id).checked = !!s[id];
+  if (dragging !== "fog_burst_s") { $("#fog_burst_s").value = s.fog_burst_s; $("#burst-out").textContent = s.fog_burst_s + " s"; }
   document.querySelectorAll(".chip").forEach((b) => b.classList.toggle("on", b.dataset.p === s.palette && !s.manual_color));
   if (s.manual_color) $("#manual").value = hex(s.manual_color);
 }
@@ -127,6 +128,11 @@ function live(d) {
   $("#cur-move").textContent = e.idle ? "" : (NAMES[e.move_fx] || e.move_fx);
   document.querySelectorAll("#wheel-color button").forEach((b) => b.classList.toggle("active", b.dataset.fx === e.color_fx));
   document.querySelectorAll("#wheel-move button").forEach((b) => b.classList.toggle("active", b.dataset.fx === e.move_fx));
+  const f = d.fog || {}, fb = $("#fog");
+  fb.style.display = f.present === false ? "none" : "";
+  fb.classList.toggle("on", !!f.on);
+  fb.classList.toggle("wait", !f.on && !f.ready);
+  $("#fog-info").textContent = f.on ? "ide" : f.ready ? "pripravený" : `⏳ ${Math.ceil(f.cooldown)} s`;
   if (JSON.stringify(d.settings) !== JSON.stringify(settings)) apply(d.settings);
 }
 
@@ -178,7 +184,14 @@ function bindControls() {
     patch({ manual_color: [...rgb, 0] });
   });
   $("#manual-off").onclick = () => patch({ manual_color: null });
-  for (const id of ["laser", "uv", "line_in"]) $("#" + id).onchange = (e) => patch({ [id]: e.target.checked });
+  for (const id of ["laser", "uv", "line_in", "fog_auto"]) $("#" + id).onchange = (e) => patch({ [id]: e.target.checked });
+  bindSlider("fog_burst_s", "fog_burst_s");
+  $("#fog_burst_s").addEventListener("input", (e) => ($("#burst-out").textContent = e.target.value + " s"));
+
+  const fb = $("#fog");
+  const fog = (on) => api("POST", "/api/fog", { on }).catch(err);
+  fb.addEventListener("pointerdown", (e) => { e.preventDefault(); fog(true); });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) fb.addEventListener(ev, () => settings.fog && fog(false));
 }
 
 async function init() {

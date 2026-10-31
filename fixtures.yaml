@@ -100,5 +100,18 @@ fixtures:
     verified: live      # belka-test 25. 10. 2026; rozsahy lasera podľa manuálu
                         # overiť: či pri 12 = 0 modul svieti stále (UV)
 
-# Spolu kanály 1–32. Posielať len 32 kanálov, nie celý univerz (viď docs/PROJEKT.md, DMX výstup).
-universe_channels: 32
+  fog:
+    name: U'King 1200W Fog Machine (6 LED)
+    start: 33           # displej d033 / A033
+    footprint: 4        # NEOVERENÉ – počet kanálov zistiť z menu/manuálu
+    # Predpoklad podľa bežných 1200W dymostrojov s RGB LED. Overiť:
+    #   python3 tools/dmx_test.py walk fog
+    channels:
+      fog: 1            # 0 = vyp, 255 = dym
+      red: 2
+      green: 3
+      blue: 4
+    verified: no
+
+# Spolu kanály 1–36. Posielať len toľko kanálov, nie celý univerz (viď docs/PROJEKT.md, DMX výstup).
+universe_channels: 40

@@ -148,3 +148,46 @@ def test_api(tmp_path, monkeypatch):
     with c.websocket_connect("/ws") as ws:
         assert "audio" in ws.receive_json()
     assert c.get("/").status_code == 200
+
+
+def test_fog_hold_limit_and_cooldown():
+    from dmxbox.audio import AudioState
+    from dmxbox.fog import FogController
+    fc = FogController(max_burst_s=10, cooldown_s=30)
+    a = AudioState(silent=False)
+    on = lambda t, hold, auto=False: fc.update(t, a, hold, auto, 3.0, False)  # noqa: E731
+    assert on(0, True)                 # stlačené → dym
+    assert on(9.9, True)
+    assert not on(10.1, True)          # max 10 s aj pri držaní
+    assert not on(20, False)
+    assert not on(25, True)            # pauza 30 s, nové stlačenie nič
+    assert not on(41, True)            # stále držané od 25 s → treba pustiť
+    assert not on(41.5, False)
+    assert on(42, True)                # po pauze nový výstrek
+    assert not on(43, False)           # pustenie ukončí výstrek
+
+
+def test_fog_auto_on_drop_and_blackout():
+    from dmxbox.audio import AudioState
+    from dmxbox.fog import FogController
+    fc = FogController(cooldown_s=30)
+    quiet = AudioState(silent=False, level=0.2, bass=0.2)
+    loud = AudioState(silent=False, level=1.0, bass=1.0)
+    t = 0.0
+    for _ in range(400):               # 10 s tichšej časti
+        assert not fc.update(t, quiet, False, True, 3.0, False)
+        t += 0.025
+    assert fc.update(t, loud, False, True, 3.0, False)      # drop → auto výstrek
+    assert fc.update(t + 2.9, loud, False, True, 3.0, False)
+    assert not fc.update(t + 3.1, loud, False, True, 3.0, False)
+    fc2 = FogController()
+    assert not fc2.update(0, loud, True, False, 3.0, True)   # blackout = nikdy dym
+
+
+def test_fog_dmx(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    store.update(fog=True)
+    assert eng.compute(a, 100.0)[32] == 255     # DMX 33 = dym
+    store.update(fog=False)
+    assert eng.compute(a, 100.1)[32] == 0

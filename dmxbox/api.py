@@ -58,6 +58,9 @@ def create_app(box) -> FastAPI:
             "dmx": {"driver": box.out.driver, "connected": box.out.connected,
                     "frames": box.out.frames_sent},
             "line_in": box.line_in.on,
+            "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
+                    "cooldown": round(box.engine.fog.status.cooldown_left, 1),
+                    "present": "fog" in box.engine.rig},
         }
 
     @app.get("/api/state")
@@ -113,6 +116,10 @@ def create_app(box) -> FastAPI:
     @app.post("/api/strobe")
     def set_strobe(body: OnBody):
         return asdict(box.store.update(strobe=body.on))
+
+    @app.post("/api/fog")
+    def set_fog(body: OnBody):
+        return asdict(box.store.update(fog=body.on))
 
     @app.post("/api/auto")
     def set_auto(body: OnBody):

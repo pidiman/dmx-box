@@ -13,7 +13,7 @@ audio:
 dmx:
   driver: udmx         # udmx | dry
   fps: 40
-  channels: 32         # posielať len 32 kanálov (uDMX klon nezvláda viac)
+  channels: 40         # 1–36 svetlá + dym; uDMX klon zvláda len malé rámce
   chunk: 8             # po koľko kanálov v jednom USB transfere
 
 output:

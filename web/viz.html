@@ -18,7 +18,7 @@
     a.pill, button.pill { color: #ddd; text-decoration: none; font: inherit; cursor: pointer; }
     .grow { flex: 1; }
     #dmx { position: fixed; left: 0; right: 0; bottom: 0; display: grid;
-      grid-template-columns: repeat(32, 1fr); gap: 2px; padding: 8px 10px 10px;
+      grid-template-columns: repeat(36, 1fr); gap: 2px; padding: 8px 10px 10px;
       background: rgba(8, 8, 14, .88); border-top: 1px solid #222; }
     #dmx.hidden { display: none; }
     .c { display: grid; grid-template-rows: 46px auto auto; gap: 2px; text-align: center; min-width: 0; }
@@ -26,10 +26,11 @@
     .c .bar i { position: absolute; left: 0; right: 0; bottom: 0; background: #29d3ff; }
     .c.parbar .bar i { background: #ff2e7e; }
     .c.belka .bar i { background: #ffb020; }
+    .c.fog .bar i { background: #b8c4d0; }
     .c b { font-weight: 600; font-size: 11px; font-variant-numeric: tabular-nums; }
     .c small { font-size: 9px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     @media (max-width: 700px) {
-      #dmx { grid-template-columns: repeat(16, 1fr); }
+      #dmx { grid-template-columns: repeat(18, 1fr); }
       .c { grid-template-rows: 30px auto auto; }
     }
   </style>

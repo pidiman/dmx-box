@@ -1,5 +1,5 @@
 // Offline shell – API a WebSocket idú vždy na sieť.
-const CACHE = "dmxbox-v2";
+const CACHE = "dmxbox-v3";
 const SHELL = ["/", "index.html", "style.css", "app.js", "manifest.json", "icon.svg", "viz.html", "viz.js"];
 
 self.addEventListener("install", (e) => {

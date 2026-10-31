@@ -17,6 +17,7 @@ Samostatná krabička na **Raspberry Pi 3B+** inšpirovaná ADJ myDMX GO. Prijí
 | MAX PartyBar4 (LED Parbar 4-way 3× 4-in-1 RGBW) | 8CH | 1 (1–8) |
 | Fractal Lights Mini LED Gobo Spot 30W (moving head) | 12CH, `SL 1` | 9 (9–20) |
 | Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (21–32) |
+| U'King 1200W Fog Machine (6 LED) | neoverené (predpoklad 4CH) | 33 (33–36) |
 
 Kanálové mapy: [`fixtures.yaml`](fixtures.yaml).
 
