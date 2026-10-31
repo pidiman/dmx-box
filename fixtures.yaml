@@ -103,15 +103,14 @@ fixtures:
   fog:
     name: U'King 1200W Fog Machine (6 LED)
     start: 33           # displej d033 / A033
-    footprint: 4        # NEOVERENÉ – počet kanálov zistiť z menu/manuálu
-    # Predpoklad podľa bežných 1200W dymostrojov s RGB LED. Overiť:
-    #   python3 tools/dmx_test.py walk fog
+    mode: 4ch
+    footprint: 4
     channels:
       fog: 1            # 0 = vyp, 255 = dym
       red: 2
       green: 3
       blue: 4
-    verified: no
+    verified: user      # potvrdené 31. 10. 2026
 
 # Spolu kanály 1–36. Posielať len toľko kanálov, nie celý univerz (viď docs/PROJEKT.md, DMX výstup).
 universe_channels: 40
