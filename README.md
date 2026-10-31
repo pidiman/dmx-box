@@ -7,7 +7,7 @@ Samostatná krabička na **Raspberry Pi 3B+** inšpirovaná ADJ myDMX GO. Prijí
 - **Bez mikrofónu:** box je v audio reťazci a analyzuje presne ten signál, ktorý hrá.
 - **Vstupy:** Bluetooth A2DP, Spotify Connect, voliteľne AirPlay a line-in (UCA202).
 - **Výstup zvuku:** UCA202 → AUX-in reproduktora (latencia ~10–20 ms, sync bez kalibrácie).
-- **DMX:** priamy uDMX výstup cez pyusb (32 kanálov po 8) → Lixada USB-DMX → XLR → wireless TX → RX pri svetlách.
+- **DMX:** priamy uDMX výstup cez pyusb (36 kanálov po 8) → Lixada USB-DMX → XLR → wireless TX → RX pri svetlách.
 - **Mozog:** Python aplikácia `dmxbox` (numpy beat engine, FX kolesá, FastAPI + PWA).
 
 ## Svetlá
@@ -57,7 +57,7 @@ python3 -m pytest -q tests
 
 Nástroje: `tools/dmx_test.py` (test kanálov), `tools/audio_meter.py` (BPM a pásma v termináli).
 
-**Virtuálne svetlá:** `http://localhost:8080/viz.html` (alebo 👁 Viz v ovládaní) kreslí PartyBar4, moving head aj Belku priamo z DMX rámca, ktorý by išiel do svetiel. Dole je panel všetkých 32 kanálov. Funguje aj s `--dry`, takže efekty sa dajú ladiť bez svetiel.
+**Virtuálne svetlá:** `http://localhost:8080/viz.html` (alebo 👁 Viz v ovládaní) kreslí PartyBar4, moving head aj Belku priamo z DMX rámca, ktorý by išiel do svetiel. Dole je panel všetkých 36 kanálov, vrátane dymostroja. Funguje aj s `--dry`, takže efekty sa dajú ladiť bez svetiel.
 
 ### Test so svetlami na Macu (pred nasadením na Pi)
 
@@ -73,8 +73,10 @@ python3 -m dmxbox.main --input "BlackHole 2ch" --port 8080
 
 - V **Audio MIDI Setup** vytvor *Multi-Output Device* (reproduktory + BlackHole 2ch) a nastav ho ako výstup Macu, aby si hudbu počul a zároveň ju box analyzoval.
 - Ovládanie: `http://localhost:8080`, z mobilu `http://<ip-macu>:8080` (rovnaká Wi-Fi).
-- Svetlá: PartyBar4 `d001` 8CH, spot `A009` 12CH + `SL 1`, Belka `d021` 12CH.
+- Svetlá: PartyBar4 `d001` 8CH, spot `A009` 12CH + `SL 1`, Belka `d021` 12CH, dymostroj `d033` 4CH.
 
 ## Stav
 
-Kód v0.1: audio analýza, engine s 8 + 8 FX, auto mód, presety, PWA, systemd a inštalácia. Otestované bez hardvéru (simulácia, 12 testov). Ďalší krok: M0–M3 na Pi so svetlami.
+Kód v0.1: audio analýza, engine s 8 + 8 FX, auto mód, dym, presety, PWA, virtuálne svetlá, systemd a inštalácia. Otestované bez hardvéru (simulácia, 15 testov). Ďalší krok: M0–M3 na Pi so svetlami.
+
+Plán a odložené funkcie (správa svetiel z UI): [docs/ROADMAP.md](docs/ROADMAP.md).
