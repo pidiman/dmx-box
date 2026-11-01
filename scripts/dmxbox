@@ -156,7 +156,10 @@ cmd_audio() {
     out)     # dmxbox audio out <ID z wpctl status | časť mena, napr. usb / bluez>
              need "${2:-}"
              if [[ "$2" =~ ^[0-9]+$ ]]; then wpctl set-default "$2"
-             else local s; s=$(pactl list short sinks | awk -v n="$2" 'index($2,n){print $2; exit}')
+             else local s   # hľadá v technickom mene aj v popise („Built-in Audio“), bez ohľadu na veľkosť písmen
+                  s=$(pactl list sinks | awk -v n="$(tr '[:upper:]' '[:lower:]' <<<"$2")" '
+                        /^[[:space:]]*Name:/ {name=$2}
+                        /^[[:space:]]*Description:/ {d=tolower($0); if (index(tolower(name), n) || index(d, n)) {print name; exit}}')
                   [[ -n "$s" ]] || die "výstup '$2' nenájdený (dmxbox audio list)"; pactl set-default-sink "$s"; fi
              echo "Výstup: $(pactl get-default-sink)" ;;
     volume)  need "${2:-}"; wpctl set-volume @DEFAULT_AUDIO_SINK@ "${2%\%}%" ;;
@@ -210,7 +213,7 @@ dmxbox – správa DMX-BOX
   spotify on | off | status       Spotify Connect (Premium + internet)
 
   audio list                      výstupy/vstupy (ID pre wpctl)
-  audio out usb | bluez | ID      kam ide zvuk (UCA202 kábel / BT reproduktor)
+  audio out usb | bluez | built-in | ID   kam ide zvuk (UCA202 / BT reproduktor / jack na Pi)
   audio volume 0-100              hlasitosť výstupu
   audio linein on | off           line-in UCA202 IN → výstup
   audio delay MS                  oneskorenie svetiel (BT reproduktor ~150–250)
