@@ -415,6 +415,10 @@ def create_app(box) -> FastAPI:
     def audio_volume(body: ValueBody):
         return _cmd(system.audio_volume, int(body.value))
 
+    @app.post("/api/system/airplay")
+    def airplay(body: OnBody):
+        return _cmd(system.airplay_set, body.on)
+
     @app.post("/api/system/spotify")
     def spotify(body: OnBody):
         return _cmd(system.spotify_set, body.on)

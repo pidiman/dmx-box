@@ -52,7 +52,7 @@ cmd_status() {
   lsusb | grep -qiE '08bb:29|burr-brown|uca' && ok "zvuková karta UCA202" || no "UCA202 nenájdená"
 
   c "Služby"
-  for s in dmxbox librespot pipewire wireplumber; do
+  for s in dmxbox airplay librespot pipewire wireplumber; do
     local st; st=$(svc_state --user "$s")
     [[ "$st" == active ]] && ok "$s" || { [[ "$s" == librespot ]] && ! systemctl --user cat librespot &>/dev/null && echo "  spotify: nenainštalovaný (dmxbox spotify on)" || no "$s ($st)"; }
   done
@@ -132,6 +132,21 @@ cmd_bt() {
 }
 
 # --- Spotify --------------------------------------------------------------------
+cmd_airplay() {
+  case "${1:-status}" in
+    on)  command -v shairport-sync >/dev/null || { echo "Inštalujem shairport-sync…"; sudo apt-get install -y shairport-sync && sudo systemctl disable --now shairport-sync; }
+         mkdir -p "$HOME/.config"
+         install -m 644 "$REPO/config/shairport-sync.conf" "$HOME/.config/shairport-sync.conf"
+         install -m 644 "$REPO/systemd/airplay.service" "$HOME/.config/systemd/user/"
+         systemctl --user daemon-reload && systemctl --user enable --now airplay
+         echo "AirPlay zapnutý: iPhone/iPad → Ovládacie centrum → AirPlay → $NAME" ;;
+    off) systemctl --user disable --now airplay && echo "AirPlay vypnutý." ;;
+    restart) systemctl --user restart airplay ;;
+    status) svc_state --user airplay ;;
+    *) die "airplay on|off|restart|status" ;;
+  esac
+}
+
 cmd_spotify() {
   case "${1:-status}" in
     on)
@@ -180,6 +195,11 @@ cmd_update() {
   git pull --ff-only || die "git pull zlyhal (lokálne zmeny? git status)"
   pip install --break-system-packages --user -q -r requirements.txt 2>/dev/null || true
   install -m 644 systemd/dmxbox.service "$HOME/.config/systemd/user/"
+  if systemctl --user cat airplay &>/dev/null; then
+    install -m 644 systemd/airplay.service "$HOME/.config/systemd/user/"
+    install -m 644 config/shairport-sync.conf "$HOME/.config/shairport-sync.conf"
+    systemctl --user daemon-reload && systemctl --user try-restart airplay
+  fi
   sudo install -m 755 scripts/dmxbox /usr/local/bin/dmxbox
   sudo install -m 755 scripts/wifi-fallback.sh /usr/local/bin/dmxbox-wifi-fallback
   systemctl --user daemon-reload && systemctl --user restart dmxbox
@@ -211,6 +231,7 @@ dmxbox – správa DMX-BOX
   bt scan | connect MAC           nájsť a pripojiť BT reproduktor
   bt name "MENO"                  meno v Bluetooth zozname
 
+  airplay on | off | status       AirPlay z iPhonu/iPadu (cez Wi-Fi)
   spotify on | off | status       Spotify Connect (Premium + internet)
 
   pin status | off | reset         PIN appky: stav / vypnúť vyžadovanie / zmazať PIN (zabudnutý PIN)
@@ -242,6 +263,7 @@ case "${1:-help}" in
   hotspot) shift; cmd_hotspot "$@" ;;
   bt|bluetooth) shift; cmd_bt "$@" ;;
   spotify) shift; cmd_spotify "$@" ;;
+  airplay) shift; cmd_airplay "$@" ;;
   audio) shift; cmd_audio "$@" ;;
   pin) SEC="$REPO/security.json"
        case "${2:-status}" in

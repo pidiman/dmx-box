@@ -10,6 +10,7 @@
 #                            aj Spotify (predvolene fajny-dmx-box; malé písmená, číslice, pomlčky)
 #   --hotspot-pass HESLO     záložný hotspot MENO, keď nie je známa Wi-Fi (min. 8 znakov)
 #   --spotify                Spotify Connect MENO (librespot; treba Premium)
+#   --no-airplay             bez AirPlay prijímača (predvolene je AirPlay zapnutý)
 #   --wifi SSID HESLO        pridať Wi-Fi sieť (dá sa zopakovať pre viac sietí)
 #   --country KÓD            krajina Wi-Fi, potrebná pre 5 GHz (predvolene SK)
 #   --hostname / --bt-name   iné meno len pre sieť / len pre Bluetooth
@@ -19,6 +20,7 @@ set -euo pipefail
 
 HOTSPOT_PASS=""
 SPOTIFY=0
+AIRPLAY=1
 NAME="fajny-dmx-box"
 HOSTNAME_NEW=""
 COUNTRY="SK"
@@ -29,13 +31,14 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --hotspot-pass) HOTSPOT_PASS="$2"; shift 2 ;;
     --spotify) SPOTIFY=1; shift ;;
+    --no-airplay) AIRPLAY=0; shift ;;
     --wifi) WIFI+=("$2" "$3"); shift 3 ;;
     --name) NAME="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --country) COUNTRY="$2"; shift 2 ;;
     --bt-name) BT_NAME="$2"; shift 2 ;;
     --no-jack) NO_JACK=1; shift ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "neznámy parameter: $1 (./install.sh --help)"; exit 1 ;;
   esac
 done
@@ -151,6 +154,15 @@ sudo loginctl enable-linger "$USER"
 mkdir -p "$HOME/.config/systemd/user"
 install -m 644 "$REPO/systemd/dmxbox.service" "$HOME/.config/systemd/user/"
 
+if [[ $AIRPLAY -eq 1 ]]; then
+  say "AirPlay prijímač (shairport-sync) – v iPhone/iPade vyber $NAME"
+  sudo apt-get install -y shairport-sync
+  sudo systemctl disable --now shairport-sync || true   # systémová verzia nevidí user PipeWire
+  mkdir -p "$HOME/.config"
+  install -m 644 "$REPO/config/shairport-sync.conf" "$HOME/.config/shairport-sync.conf"
+  install -m 644 "$REPO/systemd/airplay.service" "$HOME/.config/systemd/user/"
+fi
+
 if [[ $SPOTIFY -eq 1 ]]; then
   say "Spotify Connect (librespot)"
   curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
@@ -164,6 +176,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now pipewire pipewire-pulse wireplumber
 systemctl --user enable dmxbox
 [[ $SPOTIFY -eq 1 ]] && systemctl --user enable --now librespot
+[[ $AIRPLAY -eq 1 ]] && systemctl --user enable --now airplay
 
 say "Hotovo"
 cat <<EOF

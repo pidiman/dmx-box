@@ -8,8 +8,8 @@ const STYLES = [
   ["techno", "Techno", "Biela, modrá"], ["house", "House", "Teplé, groove"],
   ["hiphop", "Hip-hop", "Fialová, zlatá"],
 ];
-const TINT = { bt: "#29d3ff", spotify: "#6be3a0", linein: "#ffc65a", btspeaker: "#b79bff", ambient: "#ff8fb8", demo: "#9a9ab0" };
-const BADGE = { bt: "BT", spotify: "SC", linein: "IN", btspeaker: "SP", ambient: "AM", demo: "DE" };
+const TINT = { airplay: "#f2f2f7", bt: "#29d3ff", spotify: "#6be3a0", linein: "#ffc65a", btspeaker: "#b79bff", ambient: "#ff8fb8", demo: "#9a9ab0" };
+const BADGE = { airplay: "AP", bt: "BT", spotify: "SC", linein: "IN", btspeaker: "SP", ambient: "AM", demo: "DE" };
 
 let sys = null, list = [], last = null, settings = {}, choice = null, audio = { level: 0, silent: true, bpm: 0 };
 let pollTimer = null;
@@ -95,7 +95,7 @@ function openSetup(id) {
   const s = list.find((x) => x.id === id);
   choice = { id, style: id === "ambient" ? "chill" : (last?.id === id && last.style) || "auto",
              laser: settings.laser ?? true, fog_auto: settings.fog_auto ?? false };
-  if (["bt", "spotify", "linein"].includes(id)) choice.output = (last?.id === id && last.output) || defaultOutput();
+  if (["bt", "airplay", "spotify", "linein"].includes(id)) choice.output = (last?.id === id && last.output) || defaultOutput();
   if (id === "btspeaker") { choice.source = last?.source || "spotify"; choice.delay_ms = last?.delay_ms ?? 200; }
   $("#s-title").textContent = s.name;
   $("#s-desc").textContent = s.desc;
@@ -138,6 +138,18 @@ function stepSpotify(n) {
     !sp.installed ? row(false, "Spotify Connect nie je v boxe nainštalovaný") : row(sp.active ? true : null, sp.active ? "● Spotify Connect beží" : "Spustí sa po ťuknutí na Spustiť show"),
     net ? null : row(false, "Box nemá internet (hotspot) – Spotify nepôjde. Pripoj box na Wi-Fi v nastaveniach."),
     h("p", { class: "small", style: "color:#ffc65a" }, "Ak Spotify ostane na „Connecting“, tvoj účet ho nepodporuje – použi scenár Bluetooth z mobilu."));
+}
+
+function stepAirplay(n) {
+  const ap = sys?.airplay || {};
+  const hotspot = sys?.wifi?.mode === "hotspot";
+  return step(n, "Vyber box v AirPlay",
+    h("p", {}, "Na iPhone/iPade otvor Ovládacie centrum → v okienku s hudbou ťukni na ikonu AirPlay → vyber ", h("b", {}, NAME()), ". Ide to z akejkoľvek appky."),
+    !ap.installed ? row(false, "AirPlay nie je v boxe nainštalovaný (spusti znova install.sh)")
+      : row(ap.active ? true : null, ap.active ? "● AirPlay beží" : "Spustí sa po ťuknutí na Spustiť show"),
+    h("p", { class: "small" }, hotspot
+      ? "Box je v hotspote: iPhone musí byť pripojený na Wi-Fi boxu. Streamovanie (Spotify, Apple Music) bez internetu nepôjde – len stiahnutá hudba."
+      : "iPhone musí byť v rovnakej Wi-Fi ako box."));
 }
 
 function stepLinein(n) {
@@ -234,6 +246,7 @@ function renderSteps(keepScroll) {
   const add = (...els) => els.forEach((e) => e && box.append(e));
   if (id === "bt") add(stepPhone(1), stepOutput(2), stepListen(3), stepStyle(4));
   else if (id === "spotify") add(stepSpotify(1), stepOutput(2), stepListen(3), stepStyle(4));
+  else if (id === "airplay") add(stepAirplay(1), stepOutput(2), stepListen(3), stepStyle(4));
   else if (id === "linein") add(stepLinein(1), stepOutput(2), stepListen(3), stepStyle(4));
   else if (id === "btspeaker") add(stepSpeaker(1), stepSource(2), stepListen(3), stepStyle(4));
   else if (id === "ambient") add(stepInfo(1, "Pokojné svetlá", "Svetlá pomaly menia farby a hlava sa pohybuje, hudba sa nepočúva. Stroboskop, laser ani dym nejdú. Späť na hudbu prepneš cez Scenáre."));

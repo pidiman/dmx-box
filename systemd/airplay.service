@@ -1,0 +1,13 @@
+# user služba: AirPlay prijímač (shairport-sync) pod menom boxu, zvuk do PipeWire
+[Unit]
+Description=AirPlay (shairport-sync)
+After=pipewire-pulse.service network-online.target avahi-daemon.service
+Wants=pipewire-pulse.service
+
+[Service]
+ExecStart=/usr/bin/shairport-sync -c %h/.config/shairport-sync.conf
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

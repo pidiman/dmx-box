@@ -150,6 +150,12 @@ function renderAudio() {
         oninput: (e) => { out.textContent = `${e.target.value} %`; },
         onchange: (e) => act("av", () => api("POST", "/api/system/audio/volume", { value: +e.target.value })) })));
   }
+  const ap = sys.airplay || {};
+  if (ap.installed) {
+    const t = h("input", { type: "checkbox", checked: ap.active, onchange: (e) =>
+      act("ap", () => api("POST", "/api/system/airplay", { on: e.target.checked }), e.target.checked ? "AirPlay zapnutý" : "AirPlay vypnutý") });
+    g.append(h("label", { class: "item" }, lbl("AirPlay", `v iPhone/iPade: Ovládacie centrum → AirPlay → ${NAME()}`), t));
+  } else g.append(item(lbl("AirPlay", "nenainštalovaný (spusti znova install.sh)")));
   const sp = sys.spotify;
   if (sp.installed) {
     const t = h("input", { type: "checkbox", checked: sp.active, onchange: (e) =>

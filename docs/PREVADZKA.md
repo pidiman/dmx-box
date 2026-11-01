@@ -14,6 +14,7 @@ sudo reboot
 | Parameter | Význam | Predvolené |
 | --- | --- | --- |
 | `--hotspot-pass HESLO` | záložný hotspot **fajny-dmx-box**, keď nie je známa Wi-Fi (min. 8 znakov) | bez hotspotu |
+| `--no-airplay` | bez AirPlay prijímača (predvolene sa inštaluje shairport-sync, box je v iPhone/iPade v AirPlay) | AirPlay zapnutý |
 | `--spotify` | Spotify Connect pod menom boxu (librespot, treba Premium a internet; s novšími účtami nemusí fungovať, pozri [Spotify Connect](#spotify-connect)) | vypnuté |
 | `--wifi SSID HESLO` | pridá Wi-Fi sieť, dá sa zadať viackrát | – |
 | `--hostname MENO` | iné meno len pre sieť | ako `--name` |
@@ -106,6 +107,8 @@ dmxbox audio meter                  # = tools/audio_meter.py; aj --sim 128, --so
 | Nový mobil cez Bluetooth | v mobile Bluetooth → **fajny-dmx-box**, bez PIN. Box je stále viditeľný |
 | Nechcem, aby sa pripájali cudzí | `dmxbox bt hide` (spárované mobily sa pripoja ďalej), späť `dmxbox bt pair` |
 | Pripája sa iný mobil, ako chcem | `dmxbox bt list`, potom `dmxbox bt forget MAC` alebo `dmxbox bt disconnect` |
+| iPhone/iPad cez AirPlay (bez Bluetooth) | scenár **AirPlay** v appke, alebo `dmxbox airplay on`; v iPhone Ovládacie centrum → AirPlay → box |
+| Hudba cez Bluetooth seká | AirPlay namiesto Bluetooth; box na 5 GHz Wi-Fi; neskôr USB Bluetooth adaptér (vstavaný BT a Wi-Fi v Pi 3 zdieľajú jeden čip) |
 | Spotify zapnúť / vypnúť | `dmxbox spotify on` / `off` (prvé zapnutie ho aj nainštaluje) |
 | Hrá sa z počítača alebo DJ pultu káblom | `dmxbox audio linein on` (UCA202 IN → reproduktor + analýza), alebo prepínač v UI |
 | Reproduktor káblom (AUX) | `dmxbox audio out usb` |

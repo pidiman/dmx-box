@@ -20,6 +20,9 @@ SCENARIOS = [
     {"id": "bt", "name": "Bluetooth z mobilu",
      "desc": "Pustíš z akejkoľvek appky (Spotify, YouTube…). Box hrá do reproduktora a svetlá idú do rytmu.",
      "tags": ["Bez internetu", "Akákoľvek appka"]},
+    {"id": "airplay", "name": "AirPlay z iPhonu / iPadu",
+     "desc": "Z akejkoľvek appky cez Wi-Fi: v Ovládacom centre vyber AirPlay → box. Bez sekania Bluetooth, s názvom skladby.",
+     "tags": ["Wi-Fi", "Apple", "Bezstratovo"]},
     {"id": "spotify", "name": "Spotify Connect",
      "desc": "Box si hudbu sťahuje sám, mobil je len ovládač. Hovory ani notifikácie hudbu neprerušia.",
      "tags": ["Wi-Fi s internetom", "Premium"],
@@ -101,6 +104,8 @@ def apply(box, data: dict) -> dict:
         step("Spotify", system.spotify_set, True)
     if sid == "bt":
         step("Bluetooth", system.bt_discoverable, True)
+    if sid == "airplay":
+        step("AirPlay", system.airplay_set, True)
     if data.get("volume") is not None:
         step("Hlasitosť", system.audio_volume, int(data["volume"]))
 

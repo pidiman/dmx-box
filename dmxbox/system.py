@@ -349,6 +349,24 @@ def spotify_set(on: bool) -> None:
     run("systemctl", "--user", "enable" if on else "disable", "--now", "librespot", timeout=30)
 
 
+# --- AirPlay ----------------------------------------------------------------------------
+
+def airplay_status() -> dict:
+    st = {"installed": has("shairport-sync"), "active": False}
+    if st["installed"]:
+        try:
+            st["active"] = run("systemctl", "--user", "is-active", "airplay") == "active"
+        except CmdError:
+            pass
+    return st
+
+
+def airplay_set(on: bool) -> None:
+    if on and not has("shairport-sync"):
+        raise CmdError("AirPlay nie je nainštalovaný (spusti znova install.sh)")
+    run("systemctl", "--user", "enable" if on else "disable", "--now", "airplay", timeout=30)
+
+
 # --- systém -------------------------------------------------------------------------
 
 def system_info() -> dict:
@@ -402,4 +420,4 @@ def power(action: str) -> None:
 
 def status() -> dict:
     return {"wifi": wifi_status(), "bt": bt_status(), "audio": audio_status(),
-            "spotify": spotify_status(), "system": system_info()}
+            "spotify": spotify_status(), "airplay": airplay_status(), "system": system_info()}

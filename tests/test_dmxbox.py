@@ -429,3 +429,38 @@ def test_stereo_viz_and_nowplaying():
     t = parse_objects(sample)
     assert (t.title, t.artist, t.source, t.status) == ("Chimera", "Faders", "iPad", "playing")
     assert parse_objects({"type": "a{oa{sa{sv}}}", "data": [{}]}).title == ""
+
+
+def test_airplay_metadata_and_scenario(tmp_path):
+    import base64
+
+    from fastapi.testclient import TestClient
+
+    from dmxbox.api import create_app
+    from dmxbox.nowplaying import AirPlayMeta, Track, stub
+
+    def item(t, c, d=None):
+        x = f"<item><type>{t.encode().hex()}</type><code>{c.encode().hex()}</code><length>{len(d or '')}</length>"
+        if d is not None:
+            x += f'\n<data encoding="base64">\n{base64.b64encode(d.encode()).decode()}</data>'
+        return x + "</item>\n"
+
+    ap = AirPlayMeta()
+    text = item("ssnc", "snam", "Jakubov iPhone") + item("ssnc", "pbeg") + item("core", "minm", "Chimera") \
+        + item("core", "asar", "Faders")
+    rest = ap.feed(text[:70])                 # rúra posiela text po kúskoch
+    ap.feed(rest + text[70:])
+    np_ = stub()
+    np_.airplay = ap
+    np_.track = Track(title="BT skladba")
+    t = np_.track
+    assert (t.title, t.artist, t.source) == ("Chimera", "Faders", "Jakubov iPhone")   # AirPlay má prednosť
+    ap.feed(item("ssnc", "pend"))
+    assert np_.track.title == "BT skladba"
+
+    box = _box(tmp_path)
+    c = TestClient(create_app(box))
+    assert "airplay" in {s["id"] for s in c.get("/api/scenarios").json()["scenarios"]}
+    assert "airplay" in c.get("/api/system").json()
+    r = c.post("/api/scenario", json={"id": "airplay", "style": "auto"}).json()
+    assert r["ok"]                           # bez shairport-sync len varovanie, scenár beží
