@@ -1,11 +1,11 @@
-# user služba: Spotify Connect "DMX-BOX" do PipeWire (librespot z balíka raspotify)
+# user služba: Spotify Connect pod menom boxu (%H = hostname) do PipeWire (librespot z balíka raspotify)
 [Unit]
 Description=Spotify Connect (librespot)
 After=pipewire-pulse.service network-online.target
 Wants=pipewire-pulse.service
 
 [Service]
-ExecStart=/usr/bin/librespot --name DMX-BOX --device-type speaker --backend pulseaudio --bitrate 320 --disable-audio-cache --initial-volume 80
+ExecStart=/usr/bin/librespot --name %H --device-type speaker --backend pulseaudio --bitrate 320 --disable-audio-cache --initial-volume 80
 Restart=always
 RestartSec=5
 

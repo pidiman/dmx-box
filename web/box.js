@@ -3,6 +3,8 @@
 
 const $ = (s) => document.querySelector(s);
 let sys = null, wifiScan = null, btFound = null, busy = {}, showPass = false;
+const NAME = () => sys?.system?.hostname || "fajny-dmx-box";
+const SSID = () => sys?.wifi?.hotspot?.ssid || NAME();
 
 function h(tag, attrs = {}, ...kids) {
   const el = document.createElement(tag);
@@ -50,13 +52,13 @@ function renderWifi() {
   const g = $("#g-wifi"); g.innerHTML = "";
   const w = sys.wifi;
   if (!w.available) { g.append(item(lbl("Wi-Fi sa tu nedá spravovať", "NetworkManager nie je dostupný (nie Raspberry Pi?)"))); return; }
-  g.append(item(lbl(w.mode === "client" ? w.ssid : w.mode === "hotspot" ? "Hotspot DMX-BOX" : "Nepripojené",
-    w.mode === "client" ? `pripojené · ${w.ip || ""} · ${sys.system.hostname || "dmx-box"}.local` :
+  g.append(item(lbl(w.mode === "client" ? w.ssid : w.mode === "hotspot" ? `Hotspot ${SSID()}` : "Nepripojené",
+    w.mode === "client" ? `pripojené · ${w.ip || ""} · ${NAME()}.local` :
     w.mode === "hotspot" ? `bez internetu · ${w.hotspot.ip}` : "", w.mode === "client" ? "ok" : "")));
   for (const n of w.saved.filter((x) => !x.active)) {
     g.append(item(lbl(n.ssid, "uložená sieť"),
       h("button", { onclick: () => act("wc", () => api("POST", "/api/system/wifi/connect", { ssid: n.ssid }),
-        `Prepínam na ${n.ssid}… Tablet sa odpojí – pripoj ho na rovnakú sieť a otvor ${sys.system.hostname || "dmx-box"}.local`) }, "Pripojiť"),
+        `Prepínam na ${n.ssid}… Tablet sa odpojí – pripoj ho na rovnakú sieť a otvor ${NAME()}.local`) }, "Pripojiť"),
       confirmBtn("Zmazať", "Naozaj?", () => act("wd", () => api("POST", "/api/system/wifi/delete", { ssid: n.ssid }), "Zmazané"))));
   }
   // pridať sieť
@@ -78,7 +80,7 @@ function renderWifi() {
       act("wa", () => api("POST", "/api/system/wifi", { ssid: ssid.value.trim(), password: pass.value }),
         "Sieť uložená. Box sa na ňu pripojí sám, keď bude v dosahu.");
     } }, "Uložiť sieť"),
-    h("span", { class: "hint" }, "Sieť si môžeš uložiť aj vopred (napr. u kamaráta). Keď box nenájde žiadnu známu sieť, zapne hotspot DMX-BOX."));
+    h("span", { class: "hint" }, "Sieť si môžeš uložiť aj vopred (napr. u kamaráta). Keď box nenájde žiadnu známu sieť, zapne vlastný hotspot."));
   g.append(form);
 }
 
@@ -87,10 +89,10 @@ function renderHotspot() {
   const w = sys.wifi;
   if (!w.available) return;
   const hs = w.hotspot;
-  g.append(item(lbl("Wi-Fi DMX-BOX", w.mode === "hotspot" ? "beží – tablety sa pripájajú sem" : "vypnutý", w.mode === "hotspot" ? "ok" : ""),
+  g.append(item(lbl(`Wi-Fi ${SSID()}`, w.mode === "hotspot" ? "beží – tablety sa pripájajú sem" : "vypnutý", w.mode === "hotspot" ? "ok" : ""),
     w.mode === "hotspot"
       ? confirmBtn("Vypnúť", "Naozaj? Tablet sa odpojí", () => act("ho", () => api("POST", "/api/system/hotspot", { on: false }), "Hotspot sa vypína, box sa pripojí na známu Wi-Fi"))
-      : confirmBtn("Zapnúť", "Naozaj? Tablet sa odpojí", () => act("ho", () => api("POST", "/api/system/hotspot", { on: true }), "Hotspot sa zapína – pripoj tablet na Wi-Fi DMX-BOX a otvor 10.42.0.1"))));
+      : confirmBtn("Zapnúť", "Naozaj? Tablet sa odpojí", () => act("ho", () => api("POST", "/api/system/hotspot", { on: true }), `Hotspot sa zapína – pripoj tablet na Wi-Fi ${SSID()} a otvor 10.42.0.1`))));
   g.append(item(lbl("Heslo hotspotu", hs.password ? (showPass ? hs.password : "••••••••") : "nedá sa zistiť"),
     hs.password ? h("button", { onclick: () => { showPass = !showPass; render(); } }, showPass ? "Skryť" : "Ukázať") : null));
   const np = h("input", { type: "text", placeholder: "Nové heslo (min. 8 znakov)", autocomplete: "off", autocapitalize: "off" });
@@ -110,7 +112,7 @@ function renderBt() {
   if (!b.available) { g.append(item(lbl("Bluetooth nie je dostupný"))); return; }
   const disc = h("input", { type: "checkbox", checked: b.discoverable, onchange: (e) =>
     act("bd", () => api("POST", "/api/system/bt/discoverable", { on: e.target.checked }), e.target.checked ? "Viditeľný pre nové mobily" : "Skrytý – spárované zariadenia sa pripoja ďalej") });
-  g.append(h("label", { class: "item" }, lbl(`Viditeľný ako ${b.name || "DMX-BOX"}`, "vypni, keď nechceš, aby sa pripájali cudzí"), disc));
+  g.append(h("label", { class: "item" }, lbl(`Viditeľný ako ${b.name || NAME()}`, "vypni, keď nechceš, aby sa pripájali cudzí"), disc));
   if (!b.devices.length) g.append(item(lbl("Žiadne spárované zariadenia")));
   for (const d of b.devices) {
     g.append(item(lbl(d.name, (d.speaker ? "reproduktor · " : "") + (d.connected ? "pripojený" : "spárovaný"), d.connected ? "ok" : ""),
@@ -182,6 +184,7 @@ function renderSys() {
 
 function render() {
   if (!sys) return;
+  document.title = `${NAME()} – nastavenia`;
   renderWifi(); renderHotspot(); renderBt(); renderAudio(); renderDmx(); renderSys();
 }
 async function refresh() {

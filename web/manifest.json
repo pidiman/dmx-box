@@ -1,6 +1,6 @@
 {
-  "name": "DMX-BOX",
-  "short_name": "DMX-BOX",
+  "name": "fajny-dmx-box",
+  "short_name": "fajny-dmx-box",
   "description": "Hudbou riadené DMX svetlá",
   "start_url": "/",
   "display": "standalone",

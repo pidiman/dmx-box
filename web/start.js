@@ -13,6 +13,8 @@ const BADGE = { bt: "BT", spotify: "SC", linein: "IN", btspeaker: "SP", ambient:
 
 let sys = null, list = [], last = null, settings = {}, choice = null, audio = { level: 0, silent: true, bpm: 0 };
 let pollTimer = null;
+const NAME = () => sys?.system?.hostname || "fajny-dmx-box";
+const SSID = () => sys?.wifi?.hotspot?.ssid || NAME();
 
 function h(tag, attrs = {}, ...kids) {
   const el = document.createElement(tag);
@@ -50,7 +52,7 @@ function renderChips() {
   if (!sys) { c.append(h("span", { class: "chip-s bad" }, "Box neodpovedá")); return; }
   const w = sys.wifi;
   if (w.mode === "client") c.append(h("span", { class: "chip-s ok" }, `● Wi-Fi ${w.ssid}`));
-  else if (w.mode === "hotspot") c.append(h("span", { class: "chip-s warn" }, "● Hotspot DMX-BOX (bez internetu)"));
+  else if (w.mode === "hotspot") c.append(h("span", { class: "chip-s warn" }, `● Hotspot ${SSID()} (bez internetu)`));
   else if (w.available) c.append(h("span", { class: "chip-s bad" }, "● Bez Wi-Fi"));
   const d = sys.dmx;
   if (d.driver === "dry") c.append(h("span", { class: "chip-s warn" }, "DMX naprázdno (test)"));
@@ -119,10 +121,10 @@ function row(ok, text, extra) {
 function stepPhone(n) {
   const phones = (sys?.bt?.devices || []).filter((d) => d.connected && !d.speaker);
   return step(n, "Spáruj mobil",
-    h("p", {}, "V mobile otvor Nastavenia → Bluetooth a vyber ", h("b", {}, sys?.bt?.name || "DMX-BOX"), ". PIN netreba."),
+    h("p", {}, "V mobile otvor Nastavenia → Bluetooth a vyber ", h("b", {}, sys?.bt?.name || NAME()), ". PIN netreba."),
     phones.length ? phones.map((p) => row(true, `● ${p.name} · pripojený`)) : row(null, "Zatiaľ žiadny mobil – po pripojení sa tu objaví"),
     h("button", { onclick: async () => {
-      try { await api("POST", "/api/system/bt/discoverable", { on: true }); toast("DMX-BOX je viditeľný pre nové mobily"); }
+      try { await api("POST", "/api/system/bt/discoverable", { on: true }); toast(`${sys?.bt?.name || NAME()} je viditeľný pre nové mobily`); }
       catch (e) { toast("Chyba: " + e.message); }
     } }, sys?.bt?.discoverable ? "Pripojiť iný mobil (box je viditeľný)" : "Zviditeľniť box pre nový mobil"));
 }
@@ -130,8 +132,8 @@ function stepPhone(n) {
 function stepSpotify(n) {
   const sp = sys?.spotify || {};
   const net = sys?.wifi?.mode === "client";
-  return step(n, "Vyber DMX-BOX v Spotify",
-    h("p", {}, "V appke Spotify ťukni na ikonu zariadení (dole pri prehrávaní) a vyber ", h("b", {}, "DMX-BOX"), ". Treba Spotify Premium."),
+  return step(n, `Vyber ${NAME()} v Spotify`,
+    h("p", {}, "V appke Spotify ťukni na ikonu zariadení (dole pri prehrávaní) a vyber ", h("b", {}, NAME()), ". Treba Spotify Premium."),
     !sp.installed ? row(false, "Spotify Connect nie je v boxe nainštalovaný") : row(sp.active ? true : null, sp.active ? "● Spotify Connect beží" : "Spustí sa po ťuknutí na Spustiť show"),
     net ? null : row(false, "Box nemá internet (hotspot) – Spotify nepôjde. Pripoj box na Wi-Fi v nastaveniach."),
     h("p", { class: "small", style: "color:#ffc65a" }, "Ak Spotify ostane na „Connecting“, tvoj účet ho nepodporuje – použi scenár Bluetooth z mobilu."));
@@ -171,7 +173,7 @@ function stepSource(n) {
   const opt = (id, title, hint) => h("button", { class: "opt" + (choice.source === id ? " on" : ""), onclick: () => { choice.source = id; renderSteps(true); } },
     h("span", { class: "r" }), h("span", {}, h("b", {}, title), h("small", {}, hint)));
   return step(n, "Odkiaľ pôjde hudba", h("div", { class: "opts" },
-    opt("spotify", "Spotify Connect", "V Spotify vyber zariadenie DMX-BOX"),
+    opt("spotify", "Spotify Connect", `V Spotify vyber zariadenie ${NAME()}`),
     opt("linein", "Kábel do UCA202", "DJ pult, PC, prehrávač")),
     step2Delay());
 }
@@ -269,6 +271,7 @@ async function init() {
   const [sc, st] = await Promise.all([api("GET", "/api/scenarios"), api("GET", "/api/state"), loadSys()]);
   list = sc.scenarios; last = sc.last; settings = st.settings;
   renderChips(); renderHome();
+  $("#brand-name").textContent = NAME(); document.title = NAME();
   const want = location.hash.slice(1);
   if (want && list.some((x) => x.id === want)) openSetup(want);
   connectWs();

@@ -123,7 +123,7 @@ Systém je Raspberry Pi OS Lite 64-bit, headless, s hostname `dmx-box`.
 2. Prvé prihlásenie a základ:
 
 ```bash
-ssh <user>@dmx-box.local
+ssh <user>@fajny-dmx-box.local
 sudo apt update && sudo apt full-upgrade -y
 sudo raspi-config nonint do_wifi_country SK
 vcgencmd get_throttled        # musí byť throttled=0x0
@@ -246,7 +246,7 @@ ola_patch -d <device_id> -p 0 -u 1
 ola_set_dmx -u 1 -d 255,0,0,0     # test: prvé kanály parbaru
 ```
 
-Web OLA beží na `http://dmx-box.local:9090`, hodí sa na kontrolu kanálov.
+Web OLA beží na `http://fajny-dmx-box.local:9090`, hodí sa na kontrolu kanálov.
 
 3. **Art-Net vstup** (len s OLA, voliteľne) ostane zapnutý. ENTTEC EMU z Macu alebo QLC+ z PC môže poslať Art-Net do toho istého boxu a obísť vlastný engine.
 4. **Ak by `lsusb` ukázalo `0403:6001`** (FTDI), použije sa plugin `ftdidmx` namiesto uDMX. Zvyšok sa nemení.
@@ -408,7 +408,7 @@ Paleta sa riadi štýlom, kým v UI nezvolíš inú (chip „podľa štýlu“ t
 
 ## Web UI (PWA) a API
 
-Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu ako appku. UI je jedna obrazovka s veľkými tlačidlami pre ovládanie palcom. Podrobný popis každého prvku: [OVLADANIE.md](OVLADANIE.md).
+Tablet alebo mobil otvorí `http://fajny-dmx-box.local` a pridá si stránku na plochu ako appku. UI je jedna obrazovka s veľkými tlačidlami pre ovládanie palcom. Podrobný popis každého prvku: [OVLADANIE.md](OVLADANIE.md).
 
 **Obrazovka**
 
@@ -463,7 +463,7 @@ sudo nmcli con add type wifi ifname wlan0 con-name dmx-hotspot ssid DMX-BOX \
 
 **Fallback logika:** malá služba `wifi-fallback.service` po štarte čaká 30 s. Ak nie je pripojená žiadna klientská sieť, spustí `nmcli con up dmx-hotspot`.
 
-**mDNS:** `avahi-daemon` publikuje `dmx-box.local` v domácej sieti. V hotspote je box aj na `10.42.0.1`.
+**mDNS:** `avahi-daemon` publikuje `fajny-dmx-box.local` v domácej sieti. V hotspote je box aj na `10.42.0.1`.
 
 **Poznámka k hotspotu:** bez internetu Spotify Connect nefunguje, Bluetooth áno. Mimo domu je teda hlavný vstup Bluetooth, prípadne line-in.
 
@@ -532,7 +532,7 @@ journalctl --user -u dmxbox -f
 
 Každý míľnik má jasný test. Ďalší sa začína, až keď predošlý prejde.
 
-- [ ] **M0 – Pi a OS:** `ssh dmx-box.local` funguje, `vcgencmd get_throttled` = `0x0`, `lsusb` vidí Lixada aj UCA202.
+- [ ] **M0 – Pi a OS:** `ssh fajny-dmx-box.local` funguje, `vcgencmd get_throttled` = `0x0`, `lsusb` vidí Lixada aj UCA202.
 - [ ] **M1 – DMX káblom:** `ola_set_dmx -u 1 -d 255,0,0,0` rozsvieti parbar pri priamom XLR kábli.
 - [ ] **M2 – Wireless DMX:** to isté cez TX/RX, 5 minút bez výpadku pri zapnutej Wi-Fi aj BT.
 - [ ] **M3 – Fixtures:** `python3 tools/dmx_test.py walk all --log test.txt` prejde každý kanál všetkých troch svetiel podľa `fixtures.yaml`.

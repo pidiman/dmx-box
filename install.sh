@@ -6,33 +6,39 @@
 #   ./install.sh --hotspot-pass 'tajne-heslo' [--spotify]
 #
 # Parametre (všetky voliteľné, skript sa dá spustiť znova – nič nerozbije):
-#   --hotspot-pass HESLO     záložný hotspot DMX-BOX, keď nie je známa Wi-Fi (min. 8 znakov)
-#   --spotify                Spotify Connect „DMX-BOX“ (librespot; treba Premium)
+#   --name MENO              meno boxu: v sieti (http://MENO.local), Wi-Fi hotspot, Bluetooth
+#                            aj Spotify (predvolene fajny-dmx-box; malé písmená, číslice, pomlčky)
+#   --hotspot-pass HESLO     záložný hotspot MENO, keď nie je známa Wi-Fi (min. 8 znakov)
+#   --spotify                Spotify Connect MENO (librespot; treba Premium)
 #   --wifi SSID HESLO        pridať Wi-Fi sieť (dá sa zopakovať pre viac sietí)
-#   --hostname MENO          meno v sieti, web na http://MENO.local (predvolene dmx-box)
 #   --country KÓD            krajina Wi-Fi, potrebná pre 5 GHz (predvolene SK)
-#   --bt-name MENO           meno v Bluetooth zozname (predvolene DMX-BOX)
+#   --hostname / --bt-name   iné meno len pre sieť / len pre Bluetooth
 # Neskoršie zmeny bez reinštalácie: príkaz `dmxbox help` (docs/PREVADZKA.md).
 set -euo pipefail
 
 HOTSPOT_PASS=""
 SPOTIFY=0
-HOSTNAME_NEW="dmx-box"
+NAME="fajny-dmx-box"
+HOSTNAME_NEW=""
 COUNTRY="SK"
-BT_NAME="DMX-BOX"
+BT_NAME=""
 WIFI=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --hotspot-pass) HOTSPOT_PASS="$2"; shift 2 ;;
     --spotify) SPOTIFY=1; shift ;;
     --wifi) WIFI+=("$2" "$3"); shift 3 ;;
+    --name) NAME="$2"; shift 2 ;;
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --country) COUNTRY="$2"; shift 2 ;;
     --bt-name) BT_NAME="$2"; shift 2 ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     *) echo "neznámy parameter: $1 (./install.sh --help)"; exit 1 ;;
   esac
 done
+[[ "$NAME" =~ ^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$ ]] || { echo "Meno: malé písmená, číslice a pomlčky (napr. fajny-dmx-box)."; exit 1; }
+HOSTNAME_NEW="${HOSTNAME_NEW:-$NAME}"
+BT_NAME="${BT_NAME:-$NAME}"
 [[ -z "$HOTSPOT_PASS" || ${#HOTSPOT_PASS} -ge 8 ]] || { echo "Heslo hotspotu musí mať aspoň 8 znakov."; exit 1; }
 
 [[ $EUID -eq 0 ]] && { echo "Nespúšťaj ako root, sudo si skript pýta sám."; exit 1; }
@@ -62,7 +68,7 @@ elif ! grep -q '^dtparam=audio=off' "$CFG"; then
   echo 'dtparam=audio=off' | sudo tee -a "$CFG" >/dev/null
 fi
 
-say "Bluetooth: DMX-BOX ako reproduktor"
+say "Bluetooth: $BT_NAME ako reproduktor"
 sudo BT_NAME="$BT_NAME" python3 - <<'PY'
 import os, re
 p = "/etc/bluetooth/main.conf"
@@ -114,9 +120,9 @@ say "Príkaz dmxbox (správa Wi-Fi, BT, Spotify, audio)"
 sudo install -m 755 "$REPO/scripts/dmxbox" /usr/local/bin/dmxbox
 
 if [[ -n "$HOTSPOT_PASS" ]]; then
-  say "Fallback hotspot DMX-BOX (5 GHz, kanál 36)"
+  say "Fallback hotspot $NAME (5 GHz, kanál 36)"
   nmcli -t -f NAME con show | grep -qx dmx-hotspot && sudo nmcli con delete dmx-hotspot
-  sudo nmcli con add type wifi ifname wlan0 con-name dmx-hotspot ssid DMX-BOX \
+  sudo nmcli con add type wifi ifname wlan0 con-name dmx-hotspot ssid "$NAME" \
     802-11-wireless.mode ap 802-11-wireless.band a 802-11-wireless.channel 36 \
     ipv4.method shared ipv4.addresses 10.42.0.1/24 \
     wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$HOTSPOT_PASS" connection.autoconnect no

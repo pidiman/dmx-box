@@ -21,7 +21,7 @@ from .config import ROOT
 log = logging.getLogger("dmxbox.system")
 
 HOTSPOT = "dmx-hotspot"
-HOTSPOT_SSID = "DMX-BOX"
+HOTSPOT_SSID = "fajny-dmx-box"     # skutočné SSID sa číta z NetworkManageru
 MAC_RE = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){5}$", re.I)
 
 
@@ -72,6 +72,10 @@ def wifi_status() -> dict:
     if not st["available"]:
         return st
     try:
+        st["hotspot"]["ssid"] = run("nmcli", "-g", "802-11-wireless.ssid", "con", "show", HOTSPOT) or HOTSPOT_SSID
+    except CmdError:
+        pass
+    try:
         for line in run("nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device").splitlines():
             typ, state, conn = (_split_t(line) + ["", "", ""])[:3]
             if typ == "wifi" and state == "connected":
@@ -103,7 +107,7 @@ def wifi_scan() -> list[dict]:
     best: dict[str, dict] = {}
     for line in out.splitlines():
         ssid, signal, sec = (_split_t(line) + ["", "0", ""])[:3]
-        if not ssid or ssid == HOTSPOT_SSID:
+        if not ssid or ssid in (HOTSPOT_SSID, "DMX-BOX"):
             continue
         sig = int(signal or 0)
         if ssid not in best or sig > best[ssid]["signal"]:

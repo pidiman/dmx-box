@@ -13,21 +13,24 @@ sudo reboot
 
 | Parameter | Význam | Predvolené |
 | --- | --- | --- |
-| `--hotspot-pass HESLO` | záložný hotspot **DMX-BOX**, keď nie je známa Wi-Fi (min. 8 znakov) | bez hotspotu |
-| `--spotify` | Spotify Connect „DMX-BOX“ (librespot, treba Premium a internet; s novšími účtami nemusí fungovať, pozri [Spotify Connect](#spotify-connect)) | vypnuté |
+| `--hotspot-pass HESLO` | záložný hotspot **fajny-dmx-box**, keď nie je známa Wi-Fi (min. 8 znakov) | bez hotspotu |
+| `--spotify` | Spotify Connect pod menom boxu (librespot, treba Premium a internet; s novšími účtami nemusí fungovať, pozri [Spotify Connect](#spotify-connect)) | vypnuté |
 | `--wifi SSID HESLO` | pridá Wi-Fi sieť, dá sa zadať viackrát | – |
-| `--hostname MENO` | meno v sieti, web na `http://MENO.local` | `dmx-box` |
+| `--hostname MENO` | iné meno len pre sieť | ako `--name` |
 | `--country KÓD` | krajina Wi-Fi, bez nej nejde 5 GHz hotspot | `SK` |
-| `--bt-name MENO` | meno v Bluetooth zozname | `DMX-BOX` |
+| `--name MENO` | meno boxu: v sieti (`http://MENO.local`), Wi-Fi hotspot, Bluetooth aj Spotify | `fajny-dmx-box` |
+| `--bt-name MENO` | iné meno len pre Bluetooth | ako `--name` |
 
 `install.sh` sa dá spustiť znova kedykoľvek, napríklad keď chceš doplniť parameter. Nič nerozbije, len nastavenia prepíše.
 
-Príklad: ponechať pôvodné meno Pi a pridať dve siete:
+Príklad: iné meno boxu a dve Wi-Fi siete:
 
 ```bash
-./install.sh --hostname rpi3-dmxbox --hotspot-pass 'TvojeHeslo123' \
+./install.sh --name party-box --hotspot-pass 'TvojeHeslo123' \
   --wifi "DomaWiFi" "heslo1" --wifi "Chata" "heslo2"
 ```
+
+Premenovanie hotového boxu bez reinštalácie: `dmxbox name nove-meno` (sieť, hotspot, Bluetooth aj Spotify naraz).
 
 ## 2. Spôsoby spustenia
 
@@ -89,17 +92,17 @@ dmxbox audio meter                  # = tools/audio_meter.py; aj --sim 128, --so
 
 ## 3. Zmeny prostredia
 
-**Na párty bez počítača:** všetko z tejto kapitoly sa dá robiť aj z tabletu – vstupná obrazovka (`http://dmx-box.local/`) a **Nastavenia boxu** (ozubené koliesko). Popis: [OVLADANIE.md](OVLADANIE.md). Príkazy `dmxbox` nižšie sú pre SSH.
+**Na párty bez počítača:** všetko z tejto kapitoly sa dá robiť aj z tabletu – vstupná obrazovka (`http://fajny-dmx-box.local/`) a **Nastavenia boxu** (ozubené koliesko). Popis: [OVLADANIE.md](OVLADANIE.md). Príkazy `dmxbox` nižšie sú pre SSH.
 
 ### Prehľad
 
 | Situácia | Čo urobiť |
 | --- | --- |
 | Box na novom mieste s inou Wi-Fi | `dmxbox wifi add "SSID" "heslo"` (vopred doma alebo cez hotspot), potom `dmxbox wifi connect "SSID"` |
-| Žiadna Wi-Fi (párty vonku, u kamaráta) | nič, hotspot **DMX-BOX** sa zapne sám do ~1 min. Tablet sa pripojí na DMX-BOX a otvorí `http://10.42.0.1` |
+| Žiadna Wi-Fi (párty vonku, u kamaráta) | nič, hotspot **fajny-dmx-box** sa zapne sám do ~1 min. Tablet sa pripojí na fajny-dmx-box a otvorí `http://10.42.0.1` |
 | Wi-Fi vypadla počas behu | nič, po 60 s bez Wi-Fi sa zapne hotspot |
 | Späť doma | reštart boxu alebo `dmxbox wifi connect "DomaWiFi"` (cez hotspot) |
-| Nový mobil cez Bluetooth | v mobile Bluetooth → **DMX-BOX**, bez PIN. Box je stále viditeľný |
+| Nový mobil cez Bluetooth | v mobile Bluetooth → **fajny-dmx-box**, bez PIN. Box je stále viditeľný |
 | Nechcem, aby sa pripájali cudzí | `dmxbox bt hide` (spárované mobily sa pripoja ďalej), späť `dmxbox bt pair` |
 | Pripája sa iný mobil, ako chcem | `dmxbox bt list`, potom `dmxbox bt forget MAC` alebo `dmxbox bt disconnect` |
 | Spotify zapnúť / vypnúť | `dmxbox spotify on` / `off` (prvé zapnutie ho aj nainštaluje) |
@@ -131,7 +134,7 @@ Ako funguje strážca (`wifi-fallback` služba):
 - **Počas behu:** ak Wi-Fi vypadne na 60 s, zapne hotspot.
 - **Kým beží hotspot**, box nehľadá Wi-Fi, lebo jedna anténa nevie byť hotspot a klient naraz. Na Wi-Fi sa vráti po `dmxbox wifi connect` alebo po reštarte v dosahu známej siete.
 
-Ak sa na box nedá pripojiť ani cez Wi-Fi, ani cez hotspot: počkaj 1–2 minúty po zapnutí. Ak to nepomôže, zapoj Ethernet a pripoj sa cez `ssh pidiman@dmx-box.local`.
+Ak sa na box nedá pripojiť ani cez Wi-Fi, ani cez hotspot: počkaj 1–2 minúty po zapnutí. Ak to nepomôže, zapoj Ethernet a pripoj sa cez `ssh pidiman@fajny-dmx-box.local`.
 
 ### Bluetooth
 
@@ -204,9 +207,9 @@ lsusb                          # 16c0:05dc = DMX dongle, 08bb:29xx = UCA202
 
 | Príznak | Príčina / riešenie |
 | --- | --- |
-| `dmx-box.local` nefunguje | použi IP z `dmxbox status`, alebo na Androide `http://10.42.0.1` v hotspote (staršie Androidy nepoznajú `.local`) |
+| `fajny-dmx-box.local` nefunguje | použi IP z `dmxbox status`, alebo na Androide `http://10.42.0.1` v hotspote (staršie Androidy nepoznajú `.local`) |
 | BPM skáče, svetlá mimo rytmu | v UI ½× / 2× alebo TAP; skontroluj `dmxbox audio meter` |
 | Svetlá svietia pred zvukom | BT reproduktor má oneskorenie, nastav `dmxbox audio delay 150–250` |
 | Hotspot sa nezapne | `dmxbox logs wifi`; krajina Wi-Fi (`sudo raspi-config nonint get_wifi_country` musí vrátiť SK) |
-| Mobil sa nevie spárovať | `dmxbox bt forget-all`, v mobile zabudni DMX-BOX a spáruj znova |
+| Mobil sa nevie spárovať | `dmxbox bt forget-all`, v mobile zabudni fajny-dmx-box a spáruj znova |
 | `throttled` ≠ 0x0 | slabý zdroj alebo kábel; Pi 3B+ potrebuje 5 V / 2,5 A |

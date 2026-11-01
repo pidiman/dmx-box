@@ -4,11 +4,11 @@ Appka má tri časti, všetko z tabletu, bez počítača:
 
 | Stránka | Adresa | Na čo |
 | --- | --- | --- |
-| **Vstupná obrazovka** (scenáre) | `http://dmx-box.local/` | ako dnes pustíš hudbu – jedným ťuknutím nastaví zvuk aj svetlá |
-| **Ovládanie svetiel** | `http://dmx-box.local/ovladanie` | FX kolesá, štýly, strobo, presety (sekcie 1–10 nižšie) |
-| **Nastavenia boxu** | `http://dmx-box.local/box.html` | Wi-Fi, hotspot, Bluetooth, zvuk, Spotify, aktualizácia, vypnutie |
+| **Vstupná obrazovka** (scenáre) | `http://fajny-dmx-box.local/` | ako dnes pustíš hudbu – jedným ťuknutím nastaví zvuk aj svetlá |
+| **Ovládanie svetiel** | `http://fajny-dmx-box.local/ovladanie` | FX kolesá, štýly, strobo, presety (sekcie 1–10 nižšie) |
+| **Nastavenia boxu** | `http://fajny-dmx-box.local/box.html` | Wi-Fi, hotspot, Bluetooth, zvuk, Spotify, aktualizácia, vypnutie |
 
-V hotspote je adresa `http://10.42.0.1`. Po pripojení tabletu na Wi-Fi **DMX-BOX** sa vstupná obrazovka zvyčajne otvorí sama. Stránku si na tablete pridaj na plochu, potom sa otvára ako appka na celú obrazovku.
+V hotspote je adresa `http://10.42.0.1`. Po pripojení tabletu na Wi-Fi **fajny-dmx-box** sa vstupná obrazovka zvyčajne otvorí sama. Stránku si na tablete pridaj na plochu, potom sa otvára ako appka na celú obrazovku.
 
 ---
 
@@ -23,7 +23,7 @@ Hore je stav boxu: Wi-Fi (alebo hotspot), DMX dongle a kam ide zvuk. Vpravo **Ov
 | Scenár | Kroky sprievodcu | Čo box nastaví |
 | --- | --- | --- |
 | **Bluetooth z mobilu** | spáruj mobil (ukáže, či je pripojený) → kam pôjde zvuk → skúška zvuku → akcia | zvuk do zvoleného výstupu, box viditeľný pre mobily, line-in vypnutý, light delay 0 |
-| **Spotify Connect** | vyber DMX-BOX v Spotify (kontrola internetu) → výstup → skúška → akcia | zapne Spotify Connect. S novšími účtami nefunguje – potom Bluetooth |
+| **Spotify Connect** | vyber fajny-dmx-box v Spotify (kontrola internetu) → výstup → skúška → akcia | zapne Spotify Connect. S novšími účtami nefunguje – potom Bluetooth |
 | **Kábel z DJ pultu / PC** | zapoj kábel do UCA202 IN (kontrola karty) → výstup → skúška → akcia | zapne line-in |
 | **Bluetooth reproduktor** | pripoj / nájdi a spáruj reproduktor → zdroj hudby (Spotify alebo kábel) + oneskorenie svetiel → skúška → akcia | zvuk do BT reproduktora, light delay (predvolene 200 ms) |
 | **Svetlá bez hudby** | – | pokojné scény štýlu Chill bez analýzy hudby, bez strobo, lasera a dymu |
@@ -38,7 +38,7 @@ Ak niečo nevyjde (napr. chýba zvuková karta), box scenár aj tak spustí a uk
 | Sekcia | Čo sa tu dá |
 | --- | --- |
 | **Sieť** | aktuálna Wi-Fi a IP; uložené siete (**Pripojiť**, **Zmazať**); **Pridať Wi-Fi sieť** – „Nájsť siete v okolí“ alebo meno ručne + heslo. Sieť sa dá uložiť aj vopred. |
-| **Hotspot DMX-BOX** | zapnúť / vypnúť, ukázať a zmeniť heslo, „Zapnúť sám bez Wi-Fi“ |
+| **Hotspot** | zapnúť / vypnúť, ukázať a zmeniť heslo, „Zapnúť sám bez Wi-Fi“ |
 | **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 12 s) |
 | **Zvuk** | kam ide zvuk (jack, UCA202, BT reproduktor, HDMI) – **Použiť**; hlasitosť; Spotify Connect zap/vyp |
 | **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá) |
