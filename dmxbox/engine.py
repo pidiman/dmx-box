@@ -131,7 +131,10 @@ class Engine(threading.Thread):
 
         frame = self.rig.new_frame()
         self._write(frame, L, s.master, strobe=s.strobe or drop_strobe)
-        self._write_generic(frame, L, s.master, strobe=s.strobe or drop_strobe, fog_on=fog_on)
+        # samostatné lasery (napr. geometrický): stále v zvukovom móde, kým je laser povolený,
+        # nie je ticho a nie je breakdown – rytmus si laser rieši sám mikrofónom
+        laser_on = fs.laser and not self.status.idle and section != "breakdown" and s.master > 0.05
+        self._write_generic(frame, L, s.master, strobe=s.strobe or drop_strobe, fog_on=fog_on, laser_on=laser_on)
         self._write_fog(frame, L, fog_on, s.master)
         if s.blackout:
             frame = self.rig.new_frame()
@@ -165,7 +168,10 @@ class Engine(threading.Thread):
     # --- ďalšie svetlá podľa funkcií kanálov (pridané v appke) --------------------------------
     KNOWN = ("parbar", "movinghead", "belka", "fog")
 
-    def _write_generic(self, f: bytearray, L: Look, master: float, strobe: bool, fog_on: bool) -> None:
+    LASER_ON = 224     # predvolená hodnota kanála „Laser“ pri zapnutí (192–255 = zvukový mód u väčšiny laserov)
+
+    def _write_generic(self, f: bytearray, L: Look, master: float, strobe: bool, fog_on: bool,
+                       laser_on: bool = False) -> None:
         m = max(0.0, min(1.0, master))
         for i, fx in enumerate(v for k, v in self.rig.fx.items() if k not in self.KNOWN):
             head = fx.type == "moving_head"
@@ -195,7 +201,11 @@ class Engine(threading.Thread):
                     fx.set(f, ch, 255 * L.derby_motor if any(L.derby) else 0)
                 elif fn == "fog":
                     fx.set(f, ch, 255 if fog_on else 0)
-                # ostatné (makro, program, reset, efekt, iné) ostávajú 0 = DMX režim
+                elif fn == "laser":
+                    fx.set(f, ch, fx.defaults.get(ch, self.LASER_ON) if laser_on else 0)
+                elif fn in ("macro", "program", "effect", "other") and ch in fx.defaults:
+                    fx.set(f, ch, fx.defaults[ch])           # pevná hodnota z modelu („drží“)
+                # ostatné ostávajú 0 = DMX režim
 
     def _pick_fx(self, s, a: AudioState, bar: int, look: StyleLook, section: str) -> tuple[str, str]:
         if not s.auto:

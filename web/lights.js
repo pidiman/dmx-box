@@ -159,6 +159,7 @@ function renderEditor() {
   form.append(
     h("label", { class: "f" }, "Model", sel),
     prof?.notes ? h("span", { class: "hint" }, prof.notes) : null,
+    prof?.user ? h("button", { onclick: () => openProfiler(e) }, "Upraviť model (kanály, hodnoty)") : null,
     h("div", { class: "row2" }, h("label", { class: "f" }, "Mód", modeSel), h("label", { class: "f" }, "Značka (napr. SVETLO5)", label)),
     h("label", { class: "f" }, "Meno (nepovinné)", name),
     h("div", { class: "row2" },
@@ -231,10 +232,16 @@ function stopTest() {
 
 // --- nový model (editor kanálov podľa manuálu) ---------------------------------------------------
 let draft = null;
-function openProfiler() {
+function openProfiler(edit) {
   $("#editor").hidden = true;
+  if (edit) {                                   // úprava existujúceho vlastného modelu
+    const p = profile(edit.profile);
+    draft = { id: p.id, name: p.name, type: p.type, mode: edit.mode,
+      channels: (p.modes[edit.mode] || []).map((c) => ({ fn: c.fn, name: c.name, value: c.value ?? null })) };
+  }
   draft = draft || { name: "", type: "par", mode: "", channels: [{ fn: "red" }, { fn: "green" }, { fn: "blue" }] };
   $("#profiler").hidden = false;
+  $("#profiler h2").textContent = draft.id ? "Upraviť model" : "Nový model svetla";
   renderProfiler();
   $("#profiler").scrollIntoView({ behavior: "smooth" });
 }
@@ -254,18 +261,23 @@ function renderProfiler() {
         Object.entries(rig.types).map(([k, v]) => h("option", { value: k, selected: k === draft.type }, v)))),
       h("label", { class: "f" }, "Počet kanálov", count)),
     h("label", { class: "f" }, "Názov módu (nepovinné)", h("input", { type: "text", value: draft.mode, placeholder: `${draft.channels.length}ch`, oninput: (ev) => { draft.mode = ev.target.value; } })),
+    h("span", { class: "hint" }, "Hodnota (nepovinné): pri funkcii Laser = čo poslať, keď má laser svietiť (bez nej 224 = zvukový mód). Pri Efekt / Makro / Program / Iné = pevná hodnota, ktorú box stále drží (napr. stred polohy). Prázdne = 0."),
+    h("div", { class: "chrow hd" }, h("small", {}, ""), h("small", {}, "Funkcia"), h("small", {}, "Vlastný názov"), h("small", {}, "Hodnota")),
     ...draft.channels.map((c, i) => h("div", { class: "chrow" }, h("b", {}, `Kanál ${i + 1}`),
       h("select", { onchange: (ev) => { c.fn = ev.target.value; } }, fnOpts(c.fn)),
-      h("input", { type: "text", placeholder: "vlastný názov", value: c.name || "", oninput: (ev) => { c.name = ev.target.value; } }))),
+      h("input", { type: "text", placeholder: "vlastný názov", value: c.name || "", oninput: (ev) => { c.name = ev.target.value; } }),
+      h("input", { type: "text", inputmode: "numeric", placeholder: "–", value: c.value ?? "", oninput: (ev) => { c.value = ev.target.value.trim() === "" ? null : ev.target.value.trim(); } }))),
     h("div", { class: "row2" },
-      h("button", { onclick: () => { $("#profiler").hidden = true; $("#editor").hidden = false; renderEditor(); } }, "Späť"),
+      h("button", { onclick: () => { draft = null; $("#profiler").hidden = true; $("#editor").hidden = false; renderEditor(); } }, "Späť"),
       h("button", { class: "toggle on", onclick: saveProfile }, "Uložiť model")));
 }
 async function saveProfile() {
   try {
     rig = await api("POST", "/api/rig/profile", draft);
+    const wasEdit = !!draft.id;
     editing.profile = rig.created; editing.mode = Object.keys(profile(rig.created).modes)[0];
     draft = null;
+    if (wasEdit) { $("#profiler").hidden = true; $("#editor").hidden = false; renderEditor(); render(); toast("Model upravený – platí hneď"); return; }
     $("#profiler").hidden = true; $("#editor").hidden = false; renderEditor(); render();
     toast("Model uložený");
   } catch (e) { toast("Neuložené: " + e.message, 5000); }

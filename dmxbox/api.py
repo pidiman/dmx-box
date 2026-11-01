@@ -459,7 +459,8 @@ def create_app(box) -> FastAPI:
                 "errors": fxlib.validate(entries, profiles), "dongle_limit": dongle_limit,
                 "profiles": [{"id": p["id"], "name": p["name"], "type": p.get("type", "other"),
                               "user": p.get("user", False), "notes": p.get("notes", ""),
-                              "modes": {m: [{"name": c["name"], "fn": c.get("fn", "other")} for c in v.get("channels", [])]
+                              "modes": {m: [{"name": c["name"], "fn": c.get("fn", "other"), "value": c.get("value")}
+                                            for c in v.get("channels", [])]
                                         for m, v in (p.get("modes") or {}).items()}}
                              for p in profiles.values()],
                 "functions": fxlib.FUNCTIONS, "types": fxlib.TYPES, "positions": fxlib.POSITIONS, **(extra or {})}
@@ -595,10 +596,22 @@ def create_app(box) -> FastAPI:
     @app.post("/api/rig/profile")
     def add_profile(body: Patch):
         need_store()
+        data = body.model_dump()
+        old = fxlib.load_profiles().get(data.get("id") or "")
+        path = fxlib.user_dir() / f"{data.get('id')}.yaml"
+        backup = path.read_text(encoding="utf-8") if old and old.get("user") and path.exists() else None
         try:
-            prof = fxlib.save_user_profile(body.model_dump())
+            prof = fxlib.save_user_profile(data)
+            if backup is not None:               # úprava modelu, ktorý už svetlá používajú
+                errs = fxlib.validate(rig_store.load_entries(), fxlib.load_profiles())
+                if errs:
+                    raise fxlib.RigError("po zmene by sa svetlá prekrývali: " + " · ".join(errs))
         except fxlib.RigError as e:
+            if backup is not None:
+                path.write_text(backup, encoding="utf-8")
             raise HTTPException(400, str(e)) from e
+        if backup is not None:
+            box.engine.rig = rig_store.build()
         return rig_state({"created": prof["id"]})
 
     @app.get("/api/rig/export")

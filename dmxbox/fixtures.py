@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import re
 import shutil
 import time
@@ -26,7 +27,7 @@ FUNCTIONS = {
     "tilt": "Tilt", "tilt_fine": "Tilt jemne", "pt_speed": "Rýchlosť pohybu", "color_wheel": "Farebné koliesko",
     "gobo": "Gobo", "prism": "Hranol", "focus": "Zaostrenie", "macro": "Makro / mód", "speed": "Rýchlosť makra",
     "motor": "Motor (derby)", "laser": "Laser", "fog": "Dym", "program": "Program / auto (0 = DMX)",
-    "reset": "Reset", "effect": "Efekt", "other": "Iné (drží 0)",
+    "reset": "Reset", "effect": "Efekt", "other": "Iné (drží hodnotu)",
 }
 TYPES = {"par": "PAR / reflektor", "bar": "LED lišta", "moving_head": "Moving head", "effect": "Efekt (derby, laser…)",
          "fog": "Dymostroj", "other": "Iné"}
@@ -46,8 +47,13 @@ class RigError(ValueError):
 
 # --- modely -----------------------------------------------------------------------
 
+def user_dir() -> Path:
+    """Vlastné modely z appky (DMXBOX_USER_PROFILES ich presmeruje, napr. v testoch)."""
+    return Path(os.environ.get("DMXBOX_USER_PROFILES") or ROOT / "profiles" / "user")
+
+
 def profile_dirs() -> list[Path]:
-    return [ROOT / "profiles", ROOT / "profiles" / "user"]
+    return [ROOT / "profiles", user_dir()]
 
 
 def load_profiles() -> dict[str, dict]:
@@ -59,7 +65,7 @@ def load_profiles() -> dict[str, dict]:
             data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
             pid = data.get("id") or p.stem
             data["id"] = pid
-            data["user"] = d.name == "user"
+            data["user"] = d == user_dir()
             out[pid] = data
     return out
 
@@ -97,7 +103,17 @@ def save_user_profile(data: dict) -> dict:
         while nm in seen:                    # mená kanálov v móde musia byť jedinečné
             nm, k = f"{base}_{k}", k + 1
         seen.add(nm)
-        chans.append({"name": nm, "fn": fn})
+        c = {"name": nm, "fn": fn}
+        v = ch.get("value")
+        if v not in (None, ""):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                raise RigError(f"kanál {i}: hodnota musí byť číslo 0–255") from None
+            if not 0 <= v <= 255:
+                raise RigError(f"kanál {i}: hodnota musí byť 0–255")
+            c["value"] = v
+        chans.append(c)
     if not 1 <= len(chans) <= 64:
         raise RigError("model musí mať 1–64 kanálov")
     profiles = load_profiles()
@@ -106,7 +122,7 @@ def save_user_profile(data: dict) -> dict:
         pid = f"{pid}-vlastny"
     prof = {"id": pid, "name": name, "manufacturer": data.get("manufacturer", ""), "type": typ,
             "notes": data.get("notes", "Vytvorené v appke."), "modes": {mode: {"channels": chans}}}
-    d = ROOT / "profiles" / "user"
+    d = user_dir()
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{pid}.yaml").write_text(yaml.safe_dump(prof, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return prof
@@ -129,6 +145,7 @@ class Fixture:
     type: str = "other"
     fns: dict[str, str] = field(default_factory=dict)     # logické meno → funkcia
     position: str = "center"
+    defaults: dict[str, int] = field(default_factory=dict)  # pevné hodnoty kanálov z modelu
 
     @property
     def footprint(self) -> int:
@@ -191,7 +208,8 @@ def build_fixture(e: dict, profiles: dict[str, dict]) -> Fixture:
         channels={c["name"]: i for i, c in enumerate(chans, 1)},
         ranges=m.get("ranges") or {}, values=m.get("values") or {}, limits=limits,
         label=e.get("label", ""), profile=e["profile"], mode=e["mode"], type=prof.get("type", "other"),
-        fns={c["name"]: c.get("fn", "other") for c in chans}, position=e.get("position", "center"))
+        fns={c["name"]: c.get("fn", "other") for c in chans}, position=e.get("position", "center"),
+        defaults={c["name"]: int(c["value"]) for c in chans if c.get("value") is not None})
 
 
 # --- kontrola zoznamu --------------------------------------------------------------

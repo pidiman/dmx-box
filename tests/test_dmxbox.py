@@ -21,6 +21,12 @@ from dmxbox.state import Store  # noqa: E402
 from dmxbox.styles import LOOKS  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _user_profiles(tmp_path, monkeypatch):
+    """Vlastné modely z testov nikdy nejdú do skutočného profiles/user."""
+    monkeypatch.setenv("DMXBOX_USER_PROFILES", str(tmp_path / "user-profiles"))
+
+
 def rig_all():
     """Všetky svetlá z predvoleného zoznamu vrátane vypnutého dymostroja (testy dymu)."""
     from dmxbox.fixtures import RigStore
@@ -556,5 +562,43 @@ def test_rig_api_add_edit_delete_identify(tmp_path):
     assert c.delete("/api/rig/fixture/fx1").status_code == 200
     assert "fx1" not in box.engine.rig
     assert c.post("/api/rig/import", json=exp).status_code == 200          # obnova zo zálohy
-    import shutil
-    shutil.rmtree(ROOT / "profiles" / "user", ignore_errors=True)
+
+
+def test_generic_laser_follows_laser_switch_and_holds_values(tmp_path):
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.fixtures import ROOT, RigStore
+    import time as _t
+    box = _box(tmp_path)
+    box.rig_store = RigStore(tmp_path / "rig.yaml", ROOT / "rig.default.yaml")
+    c = TestClient(create_app(box))
+    chans = [{"fn": "laser", "name": "rezim"}, {"fn": "effect", "name": "vzor"}, {"fn": "effect", "name": "rotacia"},
+             {"fn": "other"}, {"fn": "other"}, {"fn": "other", "name": "pozicia_x", "value": 64},
+             {"fn": "other", "name": "pozicia_y", "value": "64"}, {"fn": "effect"}, {"fn": "other"}, {"fn": "other"}]
+    pid = c.post("/api/rig/profile", json={"name": "Laser geo", "type": "effect", "mode": "10ch",
+                                           "channels": chans}).json()["created"]
+    assert c.post("/api/rig/profile", json={"name": "Zly", "channels": [{"fn": "other", "value": 300}]}).status_code == 400
+    r = c.post("/api/rig/fixture", json={"label": "LASER1", "profile": pid, "mode": "10ch", "address": 37})
+    assert r.status_code == 200, r.text
+    a = box.analyzer.snapshot()
+    box.store.update(laser=True, auto=False)
+    f = box.engine.compute(a, _t.monotonic())
+    assert f[36] == 224 and f[41] == 64 and f[42] == 64 and f[37] == 0       # zvukový mód, stred polohy
+    box.store.update(laser=False)
+    f = box.engine.compute(a, _t.monotonic())
+    assert f[36] == 0 and f[41] == 64                                         # vypnutý, poloha drží
+    # úprava modelu: vlastná hodnota zapnutia (auto mód 160)
+    chans[0]["value"] = 160
+    assert c.post("/api/rig/profile", json={"id": pid, "name": "Laser geo", "type": "effect", "mode": "10ch",
+                                            "channels": chans}).status_code == 200
+    box.store.update(laser=True)
+    f = box.engine.compute(a, _t.monotonic())
+    assert f[36] == 160
+    # úprava, po ktorej by sa svetlá prekrývali, sa odmietne a model ostane
+    assert c.post("/api/rig/fixture", json={"label": "PAR9", "profile": "generic-rgb-par", "mode": "3ch",
+                                            "address": 47}).status_code == 200
+    bad = c.post("/api/rig/profile", json={"id": pid, "name": "Laser geo", "type": "effect", "mode": "10ch",
+                                           "channels": chans + [{"fn": "other"}]})
+    assert bad.status_code == 400 and "prekrývali" in bad.text
+    prof = next(p for p in c.get("/api/rig").json()["profiles"] if p["id"] == pid)
+    assert len(prof["modes"]["10ch"]) == 10
