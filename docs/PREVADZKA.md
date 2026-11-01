@@ -14,7 +14,7 @@ sudo reboot
 | Parameter | Význam | Predvolené |
 | --- | --- | --- |
 | `--hotspot-pass HESLO` | záložný hotspot **DMX-BOX**, keď nie je známa Wi-Fi (min. 8 znakov) | bez hotspotu |
-| `--spotify` | Spotify Connect „DMX-BOX“ (librespot, treba Premium a internet) | vypnuté |
+| `--spotify` | Spotify Connect „DMX-BOX“ (librespot, treba Premium a internet; s novšími účtami nemusí fungovať, pozri [Spotify Connect](#spotify-connect)) | vypnuté |
 | `--wifi SSID HESLO` | pridá Wi-Fi sieť, dá sa zadať viackrát | – |
 | `--hostname MENO` | meno v sieti, web na `http://MENO.local` | `dmx-box` |
 | `--country KÓD` | krajina Wi-Fi, bez nej nejde 5 GHz hotspot | `SK` |
@@ -160,7 +160,15 @@ dmxbox audio linein on | off
 dmxbox audio delay 200         # svetlá oneskoriť za BT reproduktorom (0 pri kábli)
 ```
 
-Analýza vždy počúva to, čo ide na predvolený výstup (`source: auto` v `config.yaml`). Po zmene výstupu preto netreba nič meniť.
+Analýza počúva to, čo ide na predvolený výstup (`source: auto` v `config.yaml`). Výstup sa určí pri štarte aplikácie, preto po `dmxbox audio out …` daj `dmxbox restart`.
+
+Test bez zvukovej karty (zvuk len na analýzu, platí do reštartu):
+
+```bash
+pactl load-module module-null-sink sink_name=tichy sink_properties=device.description=Tichy
+pactl set-default-sink tichy
+dmxbox restart
+```
 
 ### Spotify Connect
 
@@ -169,6 +177,8 @@ dmxbox spotify on | off | restart | status
 ```
 
 Treba Spotify Premium a internet. V režime hotspot internet nie je, preto tam ostáva Bluetooth alebo line-in.
+
+**Známy problém:** pri niektorých účtoch (hlavne založených od decembra 2025) Spotify odmieta librespotu kľúč skladby. Na tablete svieti CONNECTING a nič nehrá, v logu (`dmxbox logs librespot`) je `error audio key 0 1`. Oprava zatiaľ neexistuje ([librespot #1649](https://github.com/librespot-org/librespot/issues/1649)); použi Bluetooth alebo iný (starší) účet.
 
 ## 4. Konfiguračné súbory
 
