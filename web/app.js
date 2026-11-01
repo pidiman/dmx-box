@@ -149,7 +149,7 @@ function live(d) {
   }
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
-  dmx.className = "pill " + (d.dmx.connected ? "on" : "off");
+  dmx.className = d.dmx.connected ? "on" : "off";
   const e = d.engine;
   $("#cur-color").textContent = e.idle ? "ticho" : (NAMES[e.color_fx] || e.color_fx);
   $("#cur-move").textContent = e.idle ? "" : (NAMES[e.move_fx] || e.move_fx);
@@ -206,12 +206,24 @@ requestAnimationFrame(drawSpec);
 // --- WebSocket -------------------------------------------------------------
 function connect() {
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onopen = () => { $("#conn").textContent = "online"; $("#conn").className = "pill on"; };
+  ws.onopen = () => setOnline(true);
   ws.onmessage = (m) => live(JSON.parse(m.data));
-  ws.onclose = () => {
-    $("#conn").textContent = "offline"; $("#conn").className = "pill off";
-    setTimeout(connect, 1500);
-  };
+  ws.onclose = () => { setOnline(false); setTimeout(connect, 1500); };
+}
+function setOnline(on) {
+  const c = $("#conn"), t = on ? "Box online" : "Box offline";
+  c.className = "live " + (on ? "on" : "off"); c.title = t; c.setAttribute("aria-label", t);
+  const st = $("#st-conn"); st.textContent = on ? "online" : "offline"; st.className = on ? "on" : "off";
+}
+
+// --- hamburger menu --------------------------------------------------------
+{
+  const btn = $("#menu-btn"), menu = $("#menu");
+  const show = (open) => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+  btn.addEventListener("click", (ev) => { ev.stopPropagation(); show(menu.hidden); });
+  document.addEventListener("click", (ev) => { if (!menu.hidden && !menu.contains(ev.target)) show(false); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") show(false); });
+  menu.addEventListener("click", (ev) => { if (ev.target.closest("a")) show(false); });
 }
 
 // --- ovládacie prvky ---------------------------------------------------------

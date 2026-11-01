@@ -132,7 +132,28 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .top .track strong { font-size: 15px; font-weight: 600; }
 .top .track .tt span { font-size: 12px; color: var(--muted); }
 .top .status { flex: none; }
-@media (max-width: 520px) { .top { gap: 10px; } .top #conn, .top .lbl { display: none; } }
+@media (max-width: 520px) { .top { gap: 10px; } }
+.top .status { position: relative; align-items: center; gap: 10px; }
+.live { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.live.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.live.off { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
+.hamb { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; }
+.hamb[aria-expanded="true"] { border-color: var(--accent2); }
+.menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px; z-index: 20;
+  background: #12121c; border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .55); }
+.menu[hidden] { display: none; }
+.menu a { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px;
+  color: var(--text); text-decoration: none; font-size: 15px; }
+.menu a:hover, .menu a:focus-visible { background: var(--panel); }
+.menu a span { width: 20px; text-align: center; }
+.menu-st { display: grid; gap: 6px; margin-top: 4px; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
+.menu-st div { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.menu-st small { color: var(--muted); font-size: 13px; }
+.menu-st b { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); }
+.menu-st b.on { background: #11331f; color: var(--ok); }
+.menu-st b.off { background: #3a1616; color: #ff6b6b; }
 .spec-row { display: flex; gap: 8px; align-items: stretch; }
 .spec-ch { width: 14px; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 0;
   font-size: 11px; font-weight: 700; color: var(--muted); }
