@@ -223,7 +223,9 @@ def create_app(box) -> FastAPI:
     def get_fixtures():
         """Kanálové mapy pre virtuálne svetlá (web/viz.html)."""
         return {k: {"name": f.name, "start": f.start, "channels": f.channels,
-                    "ranges": f.ranges, "values": f.values}
+                    "ranges": f.ranges, "values": f.values, "label": f.label, "type": f.type,
+                    "fns": f.fns, "position": f.position, "profile": f.profile,
+                    "known": k in box.engine.KNOWN}
                 for k, f in box.engine.rig.fx.items()}
 
     @app.post("/api/settings")

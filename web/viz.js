@@ -1,5 +1,6 @@
 "use strict";
-// Virtuálne svetlá: kreslí PartyBar4, moving head a Belku z DMX rámca (/ws/dmx).
+// Virtuálne svetlá: kreslí PartyBar4, moving head, Belku a dym z DMX rámca (/ws/dmx),
+// plus všetky svetlá pridané v appke (podľa funkcií ich kanálov) – na druhej rampe.
 
 const cv = document.getElementById("c");
 const g = cv.getContext("2d");
@@ -264,6 +265,94 @@ function drawFog(t, floor, dt) {
   g.globalCompositeOperation = "lighter";
 }
 
+// --- svetlá pridané v appke: kreslené podľa funkcií kanálov ---------------------------------------
+const fnv = (key, fn) => {                       // hodnota prvého kanála s danou funkciou
+  const f = FX[key];
+  for (const [n, k] of Object.entries(f.fns || {})) if (k === fn) return ch(key, n);
+  return null;
+};
+const hasFn = (key, fn) => Object.values(FX[key].fns || {}).includes(fn);
+const POS_X = { left: 0.22, center: 0.5, right: 0.78 };
+
+function genericSlots() {
+  const keys = Object.keys(FX).filter((k) => !FX[k].known);
+  const groups = {};
+  for (const k of keys) (groups[FX[k].position || "center"] ||= []).push(k);
+  const out = [];
+  for (const [pos, ks] of Object.entries(groups))
+    ks.forEach((k, i) => out.push([k, W * ((POS_X[pos] ?? 0.5) + (i - (ks.length - 1) / 2) * 0.1)]));
+  return out;
+}
+
+function drawGenericLaser(key, x, y, t, floor) {
+  const f = FX[key];
+  const mode = fnv(key, "laser") ?? fnv(key, "macro") ?? 0;
+  const on = mode >= 64;                         // typicky 0–63 = vypnutý, vyššie = ručný/auto/zvuk
+  const effects = Object.entries(f.fns).filter(([, k]) => k === "effect").map(([n]) => ch(key, n));
+  const pat = effects[0] || 0;
+  const auto = mode >= 128;
+  lamp(x, y, 6 * DPR, on ? [60, 255, 90] : [40, 40, 40], on ? 1 : 0);
+  if (!on) return;
+  const cx = x + Math.sin(t * (auto ? 0.7 : 0.25)) * W * 0.12, cy = H * 0.5;
+  const sides = 3 + Math.floor((auto ? t * bpm / 240 : pat / 16)) % 6;
+  const r = H * 0.22 * (0.6 + 0.4 * Math.sin(t * (auto ? 1.3 : 0.4)));
+  const rot = t * (auto ? 1.5 : 0.5);
+  const hueBase = auto ? (t * 0.15) % 1 : (pat / 255);
+  for (let i = 0; i < sides; i++) {
+    const a0 = rot + (i / sides) * Math.PI * 2, a1 = rot + ((i + 1) / sides) * Math.PI * 2;
+    const col = hsv((hueBase + i / sides * 0.33) % 1);
+    const p0 = [cx + Math.cos(a0) * r, cy + Math.sin(a0) * r], p1 = [cx + Math.cos(a1) * r, cy + Math.sin(a1) * r];
+    g.strokeStyle = rgba(...col, 0.95); g.lineWidth = 2 * DPR;
+    g.beginPath(); g.moveTo(...p0); g.lineTo(...p1); g.stroke();
+    g.strokeStyle = rgba(...col, 0.12 + haze * 0.25); g.lineWidth = 1 * DPR;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(...p0); g.stroke();
+    glow(...p0, 6 * DPR, col, 0.6);
+  }
+}
+
+function drawGeneric(t, floor) {
+  const slots = genericSlots();
+  if (!slots.length) return;
+  const y = H * 0.24;
+  g.globalCompositeOperation = "source-over";
+  g.fillStyle = "#14141c"; g.fillRect(W * 0.1, y - 22 * DPR, W * 0.8, 8 * DPR);
+  g.globalCompositeOperation = "lighter";
+  for (const [key, x] of slots) {
+    const f = FX[key];
+    const name = `${f.label || key}${f.name ? " · " + f.name : ""}`;
+    g.globalCompositeOperation = "source-over";
+    g.fillStyle = "#1a1a24"; g.fillRect(x - 18 * DPR, y - 14 * DPR, 36 * DPR, 18 * DPR);
+    g.globalCompositeOperation = "lighter";
+    if (hasFn(key, "laser") || /laser/i.test(`${f.name} ${f.profile}`)) {
+      drawGenericLaser(key, x, y, t, floor);
+      label(name, x, y + 26 * DPR);
+      continue;
+    }
+    const r = fnv(key, "red") ?? 0, gg = fnv(key, "green") ?? 0, b = fnv(key, "blue") ?? 0;
+    const w = (fnv(key, "white") ?? 0) + (fnv(key, "amber") ?? 0) * 0.6;
+    let col = rgbw(r, gg, b, w);
+    const uv = fnv(key, "uv") ?? 0;
+    if (uv > 0 && Math.max(...col) < 20) col = [140, 50, 255];
+    const dimFn = fnv(key, "dimmer");
+    let a = (Math.max(...col, uv) / 255) * (dimFn == null ? 1 : dimFn / 255);
+    const st = fnv(key, "strobe") ?? 0;
+    if (st > 10 && a > 0) a = blink(t, 2 + (st / 255) * 16) ? a : 0;
+    const sat = Math.max(1, ...col) / 255;
+    const c = col.map((v) => v / sat);
+    const pan = fnv(key, "pan"), tilt = fnv(key, "tilt");
+    let ex = x, ey = floor;
+    if (pan != null || tilt != null) {
+      const ang = (((pan ?? 128) / 255) - 0.5) * Math.PI * 1.1;
+      const reach = floor - y;
+      ex = x + Math.sin(ang) * reach * (0.6 + ((tilt ?? 128) / 255));
+      ey = Math.min(floor, y + reach * (0.25 + 0.75 * ((tilt ?? 128) / 255)));
+    }
+    if (a > 0.01) { beam(x, y, ex, ey, 6 * DPR, W * 0.04, c, a * 0.8); glow(ex, ey, W * 0.06, c, a * 0.35); }
+    lamp(x, y, 8 * DPR, c, a);
+    label(name, x, y + 26 * DPR);
+  }
+}
+
 function label(text, x, y) {
   g.fillStyle = "#555569"; g.font = `${11 * DPR}px system-ui, sans-serif`; g.textAlign = "center";
   g.fillText(text, x, y);
@@ -281,21 +370,25 @@ function frame(ms) {
   drawParbar(t, floor);
   drawHead(t, floor);
   drawBelka(t, floor);
+  drawGeneric(t, floor);
   g.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
 // --- panel DMX kanálov -----------------------------------------------------------
 const panel = document.getElementById("dmx");
+let NCH = 36;
 function buildPanel() {
   const names = {};
+  NCH = Math.max(36, ...Object.values(FX).map((f) => f.start + Math.max(0, ...Object.values(f.channels)) - 1));
+  panel.style.gridTemplateColumns = `repeat(${innerWidth < 700 ? Math.ceil(NCH / 2) : NCH}, 1fr)`;
   for (const [key, f] of Object.entries(FX))
     for (const [n, rel] of Object.entries(f.channels)) names[f.start + rel - 1] = [key, n];
   panel.innerHTML = "";
-  for (let i = 1; i <= 36; i++) {
+  for (let i = 1; i <= NCH; i++) {
     const [key, n] = names[i] || ["", ""];
     const d = document.createElement("div");
-    d.className = "c " + key;
+    d.className = "c " + (key && !FX[key].known ? "gen" : key);
     d.title = `${i} ${key}.${n}`;
     d.innerHTML = `<div class="bar"><i id="b${i}"></i></div><b id="v${i}">0</b><small>${i} ${n.replace("_", " ")}</small>`;
     panel.appendChild(d);
@@ -303,7 +396,7 @@ function buildPanel() {
 }
 function updatePanel() {
   if (panel.classList.contains("hidden")) return;
-  for (let i = 1; i <= 36; i++) {
+  for (let i = 1; i <= NCH; i++) {
     const v = dmx[i - 1] || 0;
     document.getElementById("b" + i).style.height = `${(v / 255) * 100}%`;
     document.getElementById("v" + i).textContent = v;
@@ -327,9 +420,14 @@ function connect() {
   ws.onclose = () => { conn.textContent = "offline"; conn.className = "pill off"; setTimeout(connect, 1500); };
 }
 
-fetch("/api/fixtures").then((r) => r.json()).then((f) => {
-  FX = f;
-  buildPanel();
-  connect();
-  requestAnimationFrame(frame);
-});
+// zoznam svetiel sa môže zmeniť v appke → každých 5 s skontroluj
+let fxSig = "";
+async function loadFixtures() {
+  try {
+    const f = await (await fetch("/api/fixtures")).json();
+    const sig = JSON.stringify(f);
+    if (sig !== fxSig) { fxSig = sig; FX = f; buildPanel(); }
+  } catch { /* box offline */ }
+}
+loadFixtures().then(() => { connect(); requestAnimationFrame(frame); });
+setInterval(loadFixtures, 5000);
