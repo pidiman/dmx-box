@@ -35,7 +35,7 @@ h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-lef
 .vu span { position: absolute; left: 6px; top: 2px; font-size: 12px; color: var(--text); mix-blend-mode: difference; }
 .status { margin-left: auto; display: flex; gap: 6px; }
 a.pill { text-decoration: none; color: var(--text); }
-.pill { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); }
+.pill { white-space: nowrap; font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); }
 .pill.on { background: #11331f; color: var(--ok); }
 .pill.off { background: #3a1616; color: #ff6b6b; }
 

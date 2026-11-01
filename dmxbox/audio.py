@@ -202,6 +202,7 @@ class Analyzer(threading.Thread):
         self._quiet_since = 0.0
         self._override_bpm: float | None = None
         self._taps: collections.deque[float] = collections.deque(maxlen=8)
+        self._pending_source: tuple[Iterator[np.ndarray], bool] | None = None
 
     # --- verejné API --------------------------------------------------------
     def snapshot(self) -> AudioState:
@@ -239,17 +240,31 @@ class Analyzer(threading.Thread):
                 self.state.bpm = self._override_bpm
 
     # --- spracovanie ---------------------------------------------------------
+    def switch_source(self, source: Iterator[np.ndarray], realtime: bool = False) -> None:
+        """Vymení zdroj zvuku za behu (scenár: demo, iný výstup → nový monitor)."""
+        self._pending_source = (source, realtime)
+
     def run(self) -> None:
         period = self.hop / self.rate
-        t0 = time.monotonic()
-        for block in self.source:
-            if self._halt.is_set():
-                break
-            self.process(block)
-            if self.realtime:
-                sleep = t0 + self._frames * period - time.monotonic()
-                if sleep > 0:
-                    time.sleep(sleep)
+        while not self._halt.is_set():
+            t0, f0 = time.monotonic(), self._frames
+            src = self.source
+            for block in src:
+                if self._halt.is_set() or self._pending_source is not None:
+                    break
+                self.process(block)
+                if self.realtime:
+                    sleep = t0 + (self._frames - f0) * period - time.monotonic()
+                    if sleep > 0:
+                        time.sleep(sleep)
+            if self._pending_source is None:
+                break            # zdroj skončil (testy, konečná simulácia)
+            self.source, self.realtime = self._pending_source
+            self._pending_source = None
+            close = getattr(src, "close", None)
+            if close:
+                close()          # ukončí parec (finally v generátore)
+            log.info("audio: zdroj vymenený")
 
     def process(self, block: np.ndarray) -> None:
         n = len(block)

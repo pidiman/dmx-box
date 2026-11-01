@@ -24,6 +24,7 @@ DEFAULTS: dict = {
     "web": {"host": "0.0.0.0", "port": 80},
     "presets_file": "presets.json",
     "fixtures_file": "fixtures.yaml",
+    "scenario_file": "scenario.json",
 }
 
 

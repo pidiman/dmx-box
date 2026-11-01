@@ -45,7 +45,7 @@ git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
 sudo reboot
 ```
 
-Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku). Čo robí každé tlačidlo, efekt a štýl: **[docs/OVLADANIE.md](docs/OVLADANIE.md)**.
+Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku). Najprv vstupná obrazovka s výberom scenára (Bluetooth, Spotify, kábel, BT reproduktor, svetlá bez hudby, demo), potom ovládanie svetiel. Wi-Fi, hotspot, Bluetooth, zvuk aj aktualizácia sa menia v **Nastaveniach boxu** priamo v appke, bez SSH. Čo robí každé tlačidlo, efekt a štýl: **[docs/OVLADANIE.md](docs/OVLADANIE.md)**.
 
 Správa na Pi príkazom **`dmxbox`**: `dmxbox status`, `dmxbox wifi add …`, `dmxbox hotspot …`, `dmxbox bt …`, `dmxbox spotify on|off`, `dmxbox audio …`, `dmxbox update`. Všetky parametre inštalácie, spôsoby spustenia a postupy pri zmene Wi-Fi, mobilu či reproduktora sú v **[docs/PREVADZKA.md](docs/PREVADZKA.md)**.
 
@@ -82,6 +82,6 @@ python3 -m dmxbox.main --input "BlackHole 2ch" --port 8080
 
 ## Stav
 
-Kód v0.2: audio analýza, rozpoznanie štýlu hudby a fázy skladby, engine s 8 + 8 FX a 6 štýlmi, dym, presety, PWA, virtuálne svetlá, systemd a inštalácia. Otestované bez hardvéru (simulácia, 26 testov). Ďalší krok: M0–M3 na Pi so svetlami.
+Kód v0.3: vstupná obrazovka so scenármi, nastavenia boxu z appky (Wi-Fi, hotspot s captive portálom, Bluetooth, zvuk, Spotify, aktualizácia), audio analýza, rozpoznanie štýlu hudby a fázy skladby, engine s 8 + 8 FX a 6 štýlmi, ambient bez hudby, dym, presety, PWA, virtuálne svetlá, systemd a inštalácia. Otestované bez hardvéru (simulácia, 29 testov). Ďalší krok: M0–M3 na Pi so svetlami.
 
 Plán a odložené funkcie (správa svetiel z UI): [docs/ROADMAP.md](docs/ROADMAP.md).

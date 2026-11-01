@@ -150,6 +150,8 @@ def test_api(tmp_path, monkeypatch):
     with c.websocket_connect("/ws") as ws:
         assert "audio" in ws.receive_json()
     assert c.get("/").status_code == 200
+    assert "Ako dnes" in c.get("/").text          # vstupná obrazovka
+    assert "wheel-color" in c.get("/ovladanie").text   # pôvodné ovládanie
 
 
 def test_fog_hold_limit_and_cooldown():
@@ -285,3 +287,76 @@ def test_api_style(tmp_path):
     assert "music" in d and "section" in d["engine"]
     assert c.post("/api/settings", json={"style": "dnb"}).json()["style"] == "dnb"
     assert c.post("/api/settings", json={"style": "polka"}).status_code == 400
+
+
+# --- vstupná obrazovka: scenáre a systém ---------------------------------------
+
+def _box(tmp_path):
+    from dmxbox.audio_ctl import LineIn
+    from dmxbox.main import Box
+    from dmxbox.scenario import ScenarioStore
+    from dmxbox.sim import mix_source
+
+    rig = load_rig()
+    an = run_analyzer(120, seconds=6)
+    store = Store(tmp_path / "p.json")
+    out = DMXOut(driver="dry")
+    sources = {"live": lambda: synth_source(bpm=124, seconds=5), "demo": lambda: mix_source()}
+    return Box(store, an, Engine(rig, an, store, out), out, LineIn(), sources,
+               ScenarioStore(tmp_path / "scenario.json"))
+
+
+def test_scenarios_api(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from dmxbox.api import create_app
+    from dmxbox.scenario import ScenarioStore
+
+    box = _box(tmp_path)
+    c = TestClient(create_app(box))
+    d = c.get("/api/scenarios").json()
+    assert {s["id"] for s in d["scenarios"]} >= {"bt", "spotify", "linein", "btspeaker", "ambient", "demo"}
+    assert d["last"] is None
+    r = c.post("/api/scenario", json={"id": "demo", "style": "techno", "laser": False}).json()
+    assert r["ok"]
+    s = box.store.get()
+    assert (s.style, s.laser, s.auto, s.ambient) == ("techno", False, True, False)
+    assert box.analyzer._pending_source is not None        # demo → simulácia
+    assert ScenarioStore(tmp_path / "scenario.json").last["id"] == "demo"   # zapamätané
+    assert c.get("/api/scenarios").json()["last_summary"].startswith("Demo")
+    assert c.post("/api/scenario", json={"id": "xyz"}).status_code == 400
+    assert c.post("/api/scenario", json={"id": "bt", "style": "polka"}).status_code == 400
+    assert c.get("/api/system").status_code == 200
+    assert c.post("/api/system/bt/forget", json={"mac": "nope"}).status_code == 400
+    assert c.post("/api/system/power", json={"value": "format"}).status_code == 400
+
+
+def test_ambient_lights_without_music(tmp_path):
+    box = _box(tmp_path)
+    a = box.analyzer.snapshot()
+    a.silent = True
+    box.store.update(ambient=True, strobe=False)
+    f = box.engine.compute(a, 100.0)
+    assert not box.engine.status.idle and box.engine.status.style == "chill"
+    assert f[29] == 0                                       # bez lasera
+    box.store.update(ambient=False)
+    box.engine.compute(a, 100.1)
+    assert box.engine.status.idle                           # bez hudby → kľud
+
+
+def test_system_helpers():
+    from dmxbox import system
+    from dmxbox.api import Captive
+
+    assert system._split_t(r"Moja\:sieť:72:WPA2") == ["Moja:sieť", "72", "WPA2"]
+    assert system._sink_kind("alsa_output.usb-BurrBrown_UCA202-00.analog-stereo") == "usb"
+    assert system._sink_kind("alsa_output.platform-3f00b840.mailbox.stereo-fallback") == "jack"
+    assert system._sink_kind("bluez_output.AA_BB_CC_DD_EE_FF.1") == "bluetooth"
+    cp = Captive()
+    assert cp.foreign("captive.apple.com") and cp.foreign("connectivitycheck.gstatic.com:80")
+    assert not cp.foreign("10.42.0.1") and not cp.foreign("dmx-box.local:8080") and not cp.foreign("localhost")
+    try:
+        system.wifi_add("x", "short")
+        raise AssertionError
+    except system.CmdError:
+        pass

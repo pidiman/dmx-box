@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 import uvicorn
 
@@ -19,6 +20,7 @@ from .config import load_config, resolve
 from .dmx_out import DMXOut
 from .engine import Engine
 from .fixtures import load_rig
+from .scenario import ScenarioStore
 from .sim import GENRES, mix_source, synth_source
 from .state import Settings, Store
 
@@ -30,6 +32,8 @@ class Box:
     engine: Engine
     out: DMXOut
     line_in: LineIn
+    sources: dict[str, Callable] = field(default_factory=dict)   # "live" / "demo" → nový generátor
+    scenarios: ScenarioStore | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
@@ -37,17 +41,22 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     ac, dc = cfg["audio"], cfg["dmx"]
     rig = load_rig(cfg["fixtures_file"])
     simulated = bool(sim_bpm or genre)
-    if genre == "mix":
-        source = mix_source(rate=ac["rate"], hop=ac["hop"])
-    elif genre:
-        source = synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], genre=genre,
-                              breakdown=None)
-    elif sim_bpm:
-        source = synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], silence_every=60)
-    elif input_device:
-        source = device_source(input_device, ac["rate"], ac["hop"])
-    else:
-        source = parec_source(ac["source"], ac["rate"], ac["hop"])
+
+    def live():
+        if genre == "mix":
+            return mix_source(rate=ac["rate"], hop=ac["hop"])
+        if genre:
+            return synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], genre=genre,
+                                breakdown=None)
+        if sim_bpm:
+            return synth_source(bpm=sim_bpm, rate=ac["rate"], hop=ac["hop"], silence_every=60)
+        if input_device:
+            return device_source(input_device, ac["rate"], ac["hop"])
+        return parec_source(ac["source"], ac["rate"], ac["hop"])
+
+    sources = {"live": live, "live_realtime": simulated,
+               "demo": lambda: mix_source(rate=ac["rate"], hop=ac["hop"])}
+    source = live()
     analyzer = Analyzer(source, rate=ac["rate"], hop=ac["hop"], fft=ac["fft"],
                         bpm_min=ac["bpm_min"], bpm_max=ac["bpm_max"],
                         silence_seconds=ac["silence_seconds"], realtime=simulated)
@@ -57,7 +66,8 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     store = Store(resolve(cfg["presets_file"]),
                   Settings(light_delay_ms=cfg["output"]["light_delay_ms"]))
     engine = Engine(rig, analyzer, store, out, fps=dc["fps"])
-    return Box(store, analyzer, engine, out, LineIn())
+    return Box(store, analyzer, engine, out, LineIn(), sources,
+               ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))))
 
 
 def main() -> None:

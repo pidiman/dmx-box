@@ -89,6 +89,8 @@ dmxbox audio meter                  # = tools/audio_meter.py; aj --sim 128, --so
 
 ## 3. Zmeny prostredia
 
+**Na párty bez počítača:** všetko z tejto kapitoly sa dá robiť aj z tabletu – vstupná obrazovka (`http://dmx-box.local/`) a **Nastavenia boxu** (ozubené koliesko). Popis: [OVLADANIE.md](OVLADANIE.md). Príkazy `dmxbox` nižšie sú pre SSH.
+
 ### Prehľad
 
 | Situácia | Čo urobiť |

@@ -68,6 +68,8 @@ class Engine(threading.Thread):
     # --- výpočet jedného frame ------------------------------------------------
     def compute(self, a: AudioState, now: float) -> bytearray:
         s = self.store.get()
+        if s.ambient:
+            a, s = self._ambient(a, s, now)
         onset = a.onset_count != self._last_onset
         self._last_onset = a.onset_count
         self._flash = 1.0 if onset else self._flash * 0.82
@@ -179,6 +181,20 @@ class Engine(threading.Thread):
             L.head_dim = max(L.head_dim, 0.9)
             return look.strobe_drop and 0.0 <= since < 1.0     # strobo len 1 dobu
         return False
+
+    AMBIENT_BPM = 30.0
+
+    def _ambient(self, a: AudioState, s, now: float):
+        """Svetlá bez hudby: pokojný štýl chill na pomalom „metronóme“, bez analýzy zvuku."""
+        beats = now * self.AMBIENT_BPM / 60.0
+        wave = 0.5 + 0.5 * math.sin(2 * math.pi * now / 8.0)
+        fake = replace(a, bpm=self.AMBIENT_BPM, bpm_confident=True, beat_count=int(beats),
+                       beat_phase=beats % 1.0, silent=False, onset_count=self._last_onset,
+                       bass=0.3 + 0.3 * wave, mid=0.4, high=0.3, level=0.45 + 0.2 * wave,
+                       style="chill", section="main", drop_count=self._drop_count,
+                       build_progress=0.0)
+        return fake, replace(s, auto=True, style="chill", laser=False, fog_auto=False,
+                             strobe=s.strobe)
 
     def _idle(self, c: Ctx, L: Look) -> None:
         """Ticho: pomalé dýchanie lišty, ostatné zhasnuté."""

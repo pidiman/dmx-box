@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import socket
+import time
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import scenario as scen
+from . import system
 from .config import ROOT
 from .effects.color import COLOR_FX, PALETTES
 from .effects.movement import MOVE_FX
@@ -41,10 +46,71 @@ class BpmBody(BaseModel):
     factor: float | None = None
 
 
+class WifiBody(BaseModel):
+    ssid: str
+    password: str = ""
+
+
+class MacBody(BaseModel):
+    mac: str
+
+
+class TextBody(BaseModel):
+    value: str
+
+
+def _cmd(fn, *args):
+    """Systémový príkaz → HTTP 400 so zrozumiteľnou správou."""
+    try:
+        res = fn(*args)
+    except system.CmdError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "result": res}
+
+
+class Captive:
+    """V hotspote presmeruje cudzie domény (kontrola pripojenia mobilu) na vstupnú obrazovku.
+
+    Telefón tak po pripojení na Wi-Fi DMX-BOX sám otvorí appku (captive portal).
+    DNS v hotspote smeruje všetko na 10.42.0.1 (install.sh → dnsmasq-shared.d).
+    """
+
+    def __init__(self):
+        self.hostnames = {"localhost", socket.gethostname().lower(), socket.gethostname().lower() + ".local"}
+        self._mode, self._checked = "none", 0.0
+
+    def hotspot(self) -> bool:
+        if time.monotonic() - self._checked > 10:
+            self._checked = time.monotonic()
+            try:
+                self._mode = system.wifi_status()["mode"] if system.has("nmcli") else "none"
+            except Exception:  # noqa: BLE001 – stav siete nesmie zhodiť web
+                self._mode = "none"
+        return self._mode == "hotspot"
+
+    def foreign(self, host: str) -> bool:
+        h = host.rsplit(":", 1)[0].strip("[]").lower() if host.count(":") <= 1 else host.lower()
+        if h in self.hostnames or h.endswith(".local"):
+            return False
+        try:
+            ipaddress.ip_address(h)
+            return False
+        except ValueError:
+            return True
+
+
 def create_app(box) -> FastAPI:
     """`box` má atribúty store, analyzer, engine, out, line_in."""
-    app = FastAPI(title="DMX-BOX", version="0.1.0")
+    app = FastAPI(title="DMX-BOX", version="0.3.0")
     web = ROOT / "web"
+    captive = Captive()
+
+    @app.middleware("http")
+    async def captive_portal(request: Request, call_next):
+        host = request.headers.get("host", "")
+        if host and captive.foreign(host) and captive.hotspot():
+            return RedirectResponse("http://10.42.0.1/", status_code=302)
+        return await call_next(request)
 
     def snapshot() -> dict[str, Any]:
         a = box.analyzer.snapshot()
@@ -186,7 +252,115 @@ def create_app(box) -> FastAPI:
         except (WebSocketDisconnect, RuntimeError):
             pass
 
+    # --- scenáre (vstupná obrazovka) -------------------------------------------
+    @app.get("/api/scenarios")
+    def get_scenarios():
+        st = box.scenarios
+        return {"scenarios": scen.SCENARIOS, "last": st.last if st else None,
+                "last_summary": scen.summary(st.last if st else None),
+                "current": st.current if st else None}
+
+    @app.post("/api/scenario")
+    def set_scenario(body: Patch):
+        if box.scenarios is None:
+            raise HTTPException(503, "scenáre nie sú dostupné")
+        try:
+            return scen.apply(box, body.model_dump())
+        except system.CmdError as e:
+            raise HTTPException(400, str(e)) from e
+
+    # --- systém: Wi-Fi, BT, zvuk, Spotify (bez SSH) ---------------------------------
+    @app.get("/api/system")
+    def sys_status():
+        st = system.status()
+        st["dmx"] = {"driver": box.out.driver, "connected": box.out.connected,
+                     "fixtures": [f.name for f in box.engine.rig.fx.values()]}
+        return st
+
+    @app.get("/api/system/wifi/scan")
+    def wifi_scan():
+        return _cmd(system.wifi_scan)
+
+    @app.post("/api/system/wifi")
+    def wifi_add(body: WifiBody):
+        return _cmd(system.wifi_add, body.ssid, body.password)
+
+    @app.post("/api/system/wifi/connect")
+    def wifi_connect(body: WifiBody):
+        return _cmd(system.wifi_connect, body.ssid)
+
+    @app.post("/api/system/wifi/delete")
+    def wifi_delete(body: WifiBody):
+        return _cmd(system.wifi_delete, body.ssid)
+
+    @app.post("/api/system/hotspot")
+    def hotspot(body: OnBody):
+        return _cmd(system.hotspot_set, body.on)
+
+    @app.post("/api/system/hotspot/auto")
+    def hotspot_auto(body: OnBody):
+        return _cmd(system.hotspot_auto, body.on)
+
+    @app.post("/api/system/hotspot/password")
+    def hotspot_password(body: TextBody):
+        return _cmd(system.hotspot_password, body.value)
+
+    @app.post("/api/system/bt/discoverable")
+    def bt_discoverable(body: OnBody):
+        return _cmd(system.bt_discoverable, body.on)
+
+    @app.get("/api/system/bt/scan")
+    def bt_scan():
+        return _cmd(system.bt_scan)
+
+    @app.post("/api/system/bt/connect")
+    def bt_connect(body: MacBody):
+        return _cmd(system.bt_connect, body.mac)
+
+    @app.post("/api/system/bt/disconnect")
+    def bt_disconnect(body: MacBody):
+        return _cmd(system.bt_disconnect, body.mac)
+
+    @app.post("/api/system/bt/forget")
+    def bt_forget(body: MacBody):
+        return _cmd(system.bt_forget, body.mac)
+
+    @app.post("/api/system/audio/output")
+    def audio_output(body: TextBody):
+        res = _cmd(system.audio_output, body.value)
+        if box.sources and not box.store.get().ambient:
+            box.analyzer.switch_source(box.sources["live"](),
+                                       realtime=box.sources.get("live_realtime", False))
+        if box.line_in.on:          # loopback presmerovať na nový výstup
+            box.line_in.set(False)
+            box.line_in.set(True)
+        return res
+
+    @app.post("/api/system/audio/volume")
+    def audio_volume(body: ValueBody):
+        return _cmd(system.audio_volume, int(body.value))
+
+    @app.post("/api/system/spotify")
+    def spotify(body: OnBody):
+        return _cmd(system.spotify_set, body.on)
+
+    @app.post("/api/system/update")
+    def update():
+        return _cmd(system.update)
+
+    @app.post("/api/system/restart")
+    def restart():
+        return _cmd(system.restart_app)
+
+    @app.post("/api/system/power")
+    def power(body: TextBody):
+        return _cmd(system.power, body.value)
+
     @app.get("/")
+    def start():
+        return FileResponse(web / "start.html")
+
+    @app.get("/ovladanie")
     def index():
         return FileResponse(web / "index.html")
 

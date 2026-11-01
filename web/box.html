@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b12">
+  <title>DMX-BOX – nastavenia</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="start.css">
+</head>
+<body>
+  <div class="page">
+    <div class="bar">
+      <a class="back" href="/"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Scenáre</a>
+      <a class="pill" href="/ovladanie">Ovládanie →</a>
+    </div>
+    <h1>Nastavenia boxu</h1>
+    <p class="hint">Všetko, čo sa inak robí cez SSH. Zmeny platia hneď a ostanú aj po reštarte.</p>
+
+    <h2 class="sec-title">Sieť</h2>
+    <div class="group" id="g-wifi"><div class="item"><span class="spin"></span></div></div>
+
+    <h2 class="sec-title">Hotspot DMX-BOX</h2>
+    <div class="group" id="g-hotspot"></div>
+
+    <h2 class="sec-title">Bluetooth</h2>
+    <div class="group" id="g-bt"></div>
+
+    <h2 class="sec-title">Zvuk</h2>
+    <div class="group" id="g-audio"></div>
+
+    <h2 class="sec-title">Svetlá</h2>
+    <div class="group" id="g-dmx"></div>
+
+    <h2 class="sec-title">Systém</h2>
+    <div class="group" id="g-sys"></div>
+  </div>
+  <div id="toast" role="status"></div>
+  <script src="box.js"></script>
+</body>
+</html>

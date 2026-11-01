@@ -95,6 +95,21 @@ for ((i = 0; i < ${#WIFI[@]}; i += 2)); do
     wifi-sec.key-mgmt wpa-psk wifi-sec.psk "${WIFI[i+1]}" connection.autoconnect yes >/dev/null
 done
 
+say "Ovládanie systému z webu (Wi-Fi, hotspot, reštart) bez hesla"
+SUDOERS=/etc/sudoers.d/dmxbox
+sudo tee "$SUDOERS" >/dev/null <<EOF
+# DMX-BOX web: len tieto príkazy bez hesla (install.sh)
+$USER ALL=(root) NOPASSWD: /usr/bin/nmcli, /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff, \\
+  /usr/bin/systemctl enable --now wifi-fallback, /usr/bin/systemctl disable --now wifi-fallback, \\
+  /usr/bin/install -m 755 $REPO/scripts/dmxbox /usr/local/bin/dmxbox
+EOF
+sudo chmod 440 "$SUDOERS"
+sudo visudo -cf "$SUDOERS" >/dev/null || { echo "Chyba v $SUDOERS, mažem"; sudo rm -f "$SUDOERS"; }
+
+say "Captive portal: v hotspote sa appka otvorí sama po pripojení"
+sudo mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+echo 'address=/#/10.42.0.1' | sudo tee /etc/NetworkManager/dnsmasq-shared.d/dmxbox-captive.conf >/dev/null
+
 say "Príkaz dmxbox (správa Wi-Fi, BT, Spotify, audio)"
 sudo install -m 755 "$REPO/scripts/dmxbox" /usr/local/bin/dmxbox
 

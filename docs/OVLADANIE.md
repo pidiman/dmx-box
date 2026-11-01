@@ -1,6 +1,54 @@
 # Ovládanie svetiel (web appka)
 
-Návod na každý prvok ovládacej stránky `http://dmx-box.local` (v hotspote `http://10.42.0.1`). Stránku si na tablete pridaj na plochu, potom sa otvára ako appka na celú obrazovku.
+Appka má tri časti, všetko z tabletu, bez počítača:
+
+| Stránka | Adresa | Na čo |
+| --- | --- | --- |
+| **Vstupná obrazovka** (scenáre) | `http://dmx-box.local/` | ako dnes pustíš hudbu – jedným ťuknutím nastaví zvuk aj svetlá |
+| **Ovládanie svetiel** | `http://dmx-box.local/ovladanie` | FX kolesá, štýly, strobo, presety (sekcie 1–10 nižšie) |
+| **Nastavenia boxu** | `http://dmx-box.local/box.html` | Wi-Fi, hotspot, Bluetooth, zvuk, Spotify, aktualizácia, vypnutie |
+
+V hotspote je adresa `http://10.42.0.1`. Po pripojení tabletu na Wi-Fi **DMX-BOX** sa vstupná obrazovka zvyčajne otvorí sama. Stránku si na tablete pridaj na plochu, potom sa otvára ako appka na celú obrazovku.
+
+---
+
+## 0. Vstupná obrazovka
+
+Hore je stav boxu: Wi-Fi (alebo hotspot), DMX dongle a kam ide zvuk. Vpravo **Ovládanie →** (rovno na kolesá) a **ozubené koliesko** (nastavenia boxu).
+
+**Ako minule** (ružové tlačidlo): spustí posledný scenár s rovnakým nastavením a otvorí ovládanie. Na bežnú párty stačí toto.
+
+**Scenáre** – ťuknutie otvorí krátky sprievodcu, na konci **Spustiť show**:
+
+| Scenár | Kroky sprievodcu | Čo box nastaví |
+| --- | --- | --- |
+| **Bluetooth z mobilu** | spáruj mobil (ukáže, či je pripojený) → kam pôjde zvuk → skúška zvuku → akcia | zvuk do zvoleného výstupu, box viditeľný pre mobily, line-in vypnutý, light delay 0 |
+| **Spotify Connect** | vyber DMX-BOX v Spotify (kontrola internetu) → výstup → skúška → akcia | zapne Spotify Connect. S novšími účtami nefunguje – potom Bluetooth |
+| **Kábel z DJ pultu / PC** | zapoj kábel do UCA202 IN (kontrola karty) → výstup → skúška → akcia | zapne line-in |
+| **Bluetooth reproduktor** | pripoj / nájdi a spáruj reproduktor → zdroj hudby (Spotify alebo kábel) + oneskorenie svetiel → skúška → akcia | zvuk do BT reproduktora, light delay (predvolene 200 ms) |
+| **Svetlá bez hudby** | – | pokojné scény štýlu Chill bez analýzy hudby, bez strobo, lasera a dymu |
+| **Demo** | akcia | simulovaný DJ set (bez zvuku), svetlá hrajú, akoby išla hudba |
+
+**Aká bude akcia** = štýl svetiel (AUTO, Párty, Chill, DnB, Techno, House, Hip-hop) + Laser a Dym na drop. To isté sa dá neskôr meniť v ovládaní.
+
+Ak niečo nevyjde (napr. chýba zvuková karta), box scenár aj tak spustí a ukáže, čo nefungovalo.
+
+## Nastavenia boxu
+
+| Sekcia | Čo sa tu dá |
+| --- | --- |
+| **Sieť** | aktuálna Wi-Fi a IP; uložené siete (**Pripojiť**, **Zmazať**); **Pridať Wi-Fi sieť** – „Nájsť siete v okolí“ alebo meno ručne + heslo. Sieť sa dá uložiť aj vopred. |
+| **Hotspot DMX-BOX** | zapnúť / vypnúť, ukázať a zmeniť heslo, „Zapnúť sám bez Wi-Fi“ |
+| **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 12 s) |
+| **Zvuk** | kam ide zvuk (jack, UCA202, BT reproduktor, HDMI) – **Použiť**; hlasitosť; Spotify Connect zap/vyp |
+| **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá) |
+| **Systém** | verzia, teplota a napájanie; **Aktualizovať** z GitHubu (treba internet); reštart appky; reštart boxu; **Vypnúť box** pred vytiahnutím zo zásuvky |
+
+Akcie, ktoré odpoja tablet alebo vypnú box, treba potvrdiť druhým ťuknutím. Pri prepnutí Wi-Fi alebo hotspotu sa tablet odpojí – pripoj ho na novú sieť a otvor appku znova.
+
+---
+
+# Ovládanie svetiel (`/ovladanie`)
 
 Zmeny platia okamžite a vidia ich všetky pripojené tablety a mobily naraz. Nastavenia sa po reštarte boxu vrátia na predvolené; trvalo ich uložíš do **presetu**.
 
@@ -15,6 +63,7 @@ Svetlá v texte: **lišta** = MAX PartyBar4, **hlava** = moving head Fractal Gob
 | **● bodka** | bliká na každú dobu (beat). Ak bliká mimo hudby, oprav tempo (½× / 2× / TAP). |
 | **BPM** | odhadnuté tempo. `---` = ticho. |
 | **B / M / H** | úroveň basov, stredov a výšok (automaticky prispôsobená hlasitosti). |
+| **⌂ Scenáre** | späť na vstupnú obrazovku (zmena scenára, nastavenia boxu). |
 | **👁 Viz** | otvorí virtuálne svetlá (`viz.html`) – kreslí presne to, čo ide do svetiel. Na testy bez svetiel. |
 | **online / offline** | spojenie tabletu s boxom. Pri offline sa appka pripája znova sama. |
 | **DMX / DMX dry** | zelené = DMX dongle pripojený, červené = nenájdený. `DMX dry` = beží naprázdno (bez donglu, na test). |
