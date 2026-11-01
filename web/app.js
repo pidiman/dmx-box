@@ -15,6 +15,38 @@ const PALETTE_SW = {
   fire: ["#f00", "#f50", "#f90", "#f44"],
   urban: ["#90f", "#f90", "#f09", "#20f"],
 };
+// legenda kolies (texty podľa docs/OVLADANIE.md)
+const FX_INFO = {
+  color: {
+    title: "Farby – čo robí ktorý efekt",
+    intro: "Koleso <b>Farby</b> riadi farby a jas lišty, Belky (PAR, derby, laser, strobo) a farbu moving headu. <b>Ťuk na efekt</b> ho zapne a vypne AUTO – potom svieti len tento efekt. AUTO ich strieda sám podľa štýlu hudby.",
+    items: {
+      beat_chase: ["Každú dobu nová farba z palety. Farby „bežia“ po svetlách, jas pulzuje do rytmu, laser každú 4. dobu.", ["univerzálny", "pop", "house"]],
+      bass_pump: ["Jas všetkých svetiel podľa sily basov, farba sa mení každý takt.", ["výrazná basa", "pomalšie časti"]],
+      color_step: ["Stála plná farba, mení sa každý takt, derby sa točí pomaly.", ["pokojné skladby", "čistý vzhľad"]],
+      rainbow: ["Plynulý dúhový prechod cez 16 dôb, svetlá posunuté o tretinu kruhu. Ak je povolené UV, jemný UV podklad.", ["chill", "úvod", "breakdown"]],
+      split: ["Lišta a Belka PAR sa striedajú na dobu, derby svieti na nepárne doby, laser každú 2. dobu.", ["rytmické", "rock", "pop"]],
+      kick_flash: ["Biely záblesk na každý úder basového bubna, inak tlmená farba. Derby a laser na silný úder.", ["DnB", "techno", "hip-hop"]],
+      build_up: ["Blikanie zrýchľuje s energiou hudby, keď je hudba naplno, zapne strobo Belky.", ["nástup pred dropom", "stúpajúce časti"]],
+      derby_party: ["V refréne derby naplno a laser na každú dobu, v tichších častiach derby tlmene a UV podklad.", ["refrény", "párty vrcholy"]],
+    },
+  },
+  move: {
+    title: "Pohyb – čo robí ktorý efekt",
+    intro: "Koleso <b>Pohyb</b> riadi moving head: smer, gobo a pohyb. Motor nestíha rýchle plynulé pohyby, preto rýchle efekty <b>skáču medzi pozíciami</b> na dobu a plynulé sú pomalé. Tilt je obmedzený, aby hlava nesvietila do očí. <b>Ťuk na efekt</b> ho zapne a vypne AUTO.",
+    items: {
+      jump: ["Skok na ďalšiu z 10 pozícií v miestnosti na každú dobu, gobo sa mení každý takt.", ["hlavný režim", "párty"]],
+      circle_slow: ["Pomalý kruh cez 8 dôb, otvorené svetlo bez gobo.", ["pomalá hudba", "chill"]],
+      sweep: ["Pan zľava doprava a späť na každú dobu.", ["rytmické", "house"]],
+      tilt_bounce: ["Hore-dole na každú dobu, pan sa posunie každý takt.", ["rytmické", "pop"]],
+      snap: ["Náhodná pozícia a gobo každé 2 doby, na kick sa rozsvieti naplno.", ["DnB", "techno"]],
+      audience: ["Pomalý plynulý pohyb nad hlavami ľudí cez 16 dôb, rotujúce gobo.", ["breakdown", "atmosféra"]],
+      gobo_beat: ["Hlava stojí, na každú dobu iné gobo, na silný kick gobo zatrasie.", ["kick", "hip-hop"]],
+      hold: ["Hlava stojí v strede a svieti.", ["statická scéna", "spev"]],
+    },
+  },
+};
+
 const SECTION_NAMES = { main: "hrá", breakdown: "breakdown", build: "build-up", drop: "DROP" };
 let styleNames = {};
 
@@ -152,6 +184,10 @@ function live(d) {
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
   const e = d.engine;
+  if (lastFx.color !== e.color_fx || lastFx.move !== e.move_fx) {
+    lastFx = { color: e.color_fx, move: e.move_fx };
+    if (infoOpen) renderInfo();
+  }
   $("#cur-color").textContent = e.idle ? "ticho" : (NAMES[e.color_fx] || e.color_fx);
   $("#cur-move").textContent = e.idle ? "" : (NAMES[e.move_fx] || e.move_fx);
   document.querySelectorAll("#wheel-color button").forEach((b) => b.classList.toggle("active", b.dataset.fx === e.color_fx));
@@ -230,6 +266,42 @@ function sysStats(st) {
   te.hidden = t == null;
   const mt = $("#ms-temp"); mt.textContent = t == null ? "" : `${Math.round(t)} °C`; mt.className = tl; mt.hidden = t == null;
 }
+// --- legenda kolies (i) -------------------------------------------------------
+let infoOpen = null, lastFx = { color: null, move: null };
+function renderInfo() {
+  const w = infoOpen, info = FX_INFO[w], cur = lastFx[w];
+  const list = $("#sh-list"); list.innerHTML = "";
+  for (const [k, [desc, when]] of Object.entries(info.items)) {
+    const li = document.createElement("li");
+    if (k === cur) li.className = "on";
+    li.innerHTML = `<span class="sw"></span><b>${NAMES[k] || k}${k === cur ? "<em>PRÁVE BEŽÍ</em>" : ""}</b><p></p><div class="when"></div>`;
+    li.querySelector("p").textContent = desc;
+    for (const t of when) { const sp = document.createElement("span"); sp.textContent = t; li.querySelector(".when").append(sp); }
+    list.append(li);
+  }
+}
+let infoReturn = null;
+function openInfo(w, btn) {
+  infoOpen = w; infoReturn = btn;
+  const sheet = $("#info-sheet .sheet");
+  sheet.classList.toggle("move", w === "move");
+  $("#sh-title").textContent = FX_INFO[w].title;
+  $("#sh-intro").innerHTML = FX_INFO[w].intro;
+  renderInfo();
+  $("#info-sheet").hidden = false;
+  sheet.scrollTop = 0;
+  $("#sh-close").focus();
+}
+function closeInfo() {
+  if (!infoOpen) return;
+  infoOpen = null; $("#info-sheet").hidden = true;
+  if (infoReturn) infoReturn.focus();
+}
+document.querySelectorAll(".info-btn").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); openInfo(b.dataset.info, b); }));
+$("#sh-close").addEventListener("click", closeInfo);
+$("#info-sheet").addEventListener("click", (ev) => { if (ev.target.id === "info-sheet") closeInfo(); });
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeInfo(); });
+
 function setOnline(on) {
   const c = $("#conn"), t = on ? "Box online" : "Box offline";
   c.className = "live " + (on ? "on" : "off"); c.title = t; c.setAttribute("aria-label", t);

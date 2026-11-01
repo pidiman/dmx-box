@@ -183,3 +183,34 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .menu-st .pi b.lv-warn { background: #33270a; color: var(--warn); }
 .menu-st .pi b.lv-bad { background: #3a1616; color: #ff6b6b; }
 @media (max-width: 640px) { .sysg { display: none !important; } }
+
+/* legenda kolies: (i) a okno s popisom efektov */
+.wheel-box { position: relative; }
+.info-btn { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; background: #1d1d2c; border: 1px solid #2e2e44; color: #a3a3b8; cursor: pointer; }
+.info-btn:hover, .info-btn:focus-visible { color: #fff; border-color: var(--accent2); }
+.sheet-bg { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+  background: rgba(4, 4, 8, .66); backdrop-filter: blur(3px); }
+.sheet-bg[hidden] { display: none; }
+.sheet { --c: var(--accent); --cbg: #2a1020; width: min(560px, 100%); max-height: min(82vh, 720px); overflow: auto;
+  overscroll-behavior: contain; background: #12121c; border: 1px solid var(--line); border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .6); }
+.sheet.move { --c: var(--accent2); --cbg: #0d2630; }
+.sheet header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px;
+  padding: 16px 18px 12px; background: #12121c; border-bottom: 1px solid var(--line); }
+.sheet header h3 { margin: 0; font-size: 18px; }
+.sheet .sh-i { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: #1d1d2c; border: 1px solid #2e2e44; color: var(--c); font-weight: 700; }
+.sheet .x { margin-left: auto; width: 36px; height: 36px; flex: none; padding: 0; border-radius: 50%;
+  background: #1d1d2c; border: 0; color: #ddd; font-size: 18px; cursor: pointer; }
+.sheet .intro { margin: 0; padding: 12px 18px 4px; color: #a3a3b8; font-size: 13px; line-height: 1.45; }
+.sheet .intro b { color: var(--text); }
+.fxl { list-style: none; margin: 0; padding: 8px 10px 14px; display: grid; gap: 4px; }
+.fxl li { display: grid; grid-template-columns: 12px 1fr; gap: 4px 12px; padding: 10px 8px; border-radius: 12px; }
+.fxl li.on { background: var(--cbg); outline: 1px solid var(--c); }
+.fxl .sw { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; background: var(--c); }
+.fxl b { font-size: 15px; }
+.fxl b em { font-style: normal; font-size: 11px; color: var(--c); margin-left: 8px; letter-spacing: .06em; }
+.fxl p { grid-column: 2; margin: 0; font-size: 13px; color: #c7c7d6; line-height: 1.4; }
+.fxl .when { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.fxl .when span { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #1d1d2c; color: var(--muted); }

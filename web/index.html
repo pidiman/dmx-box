@@ -54,10 +54,12 @@
     <section class="wheels">
       <div class="wheel-box">
         <h2>Farby <em id="cur-color"></em></h2>
+        <button class="info-btn" data-info="color" aria-label="Čo robia efekty farieb" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
         <div class="wheel" id="wheel-color"></div>
       </div>
       <div class="wheel-box">
         <h2>Pohyb <em id="cur-move"></em></h2>
+        <button class="info-btn" data-info="move" aria-label="Čo robia efekty pohybu" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
         <div class="wheel" id="wheel-move"></div>
       </div>
     </section>
@@ -122,6 +124,13 @@
     </details>
   </main>
 
+  <div id="info-sheet" class="sheet-bg" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+      <header><span class="sh-i" aria-hidden="true">i</span><h3 id="sh-title"></h3><button class="x" id="sh-close" aria-label="Zavrieť">✕</button></header>
+      <p class="intro" id="sh-intro"></p>
+      <ul class="fxl" id="sh-list"></ul>
+    </section>
+  </div>
   <div id="toast" role="status"></div>
   <script src="app.js"></script>
 </body>

@@ -101,7 +101,7 @@ Svetlá v texte: **lišta** = MAX PartyBar4, **hlava** = moving head Fractal Gob
 
 ## 2. FX kolesá
 
-Dve kolesá ako v myDMX GO. **Ťuknutie na efekt ho zapne a vypne AUTO** (ďalej svieti len zvolená kombinácia). Aktívny efekt je zvýraznený a jeho meno je pri nadpise; pri tichu je tam „ticho“.
+Dve kolesá ako v myDMX GO. **Ťuknutie na efekt ho zapne a vypne AUTO** (ďalej svieti len zvolená kombinácia). Aktívny efekt je zvýraznený a jeho meno je pri nadpise; pri tichu je tam „ticho“. Ikona **(i)** v pravom hornom rohu kolesa otvorí legendu: čo robí každý efekt, kedy sa hodí a ktorý práve beží.
 
 ### Koleso 1 – Farby (lišta, Belka PAR, derby, laser, farba hlavy)
 
