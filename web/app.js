@@ -147,6 +147,7 @@ function live(d) {
     $("#track-title").textContent = tr.title;
     $("#track-artist").textContent = [tr.artist, tr.source && `· ${tr.source}`].filter(Boolean).join(" ");
   }
+  sysStats(d.sys);
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
@@ -209,6 +210,25 @@ function connect() {
   ws.onopen = () => setOnline(true);
   ws.onmessage = (m) => live(JSON.parse(m.data));
   ws.onclose = () => { setOnline(false); setTimeout(connect, 1500); };
+}
+// vyťaženie Pi: zelená < 60 %, oranžová 60–85 %, červená > 85 %; teplota 70 / 80 °C
+const lvl = (v, w, b) => (v == null ? "" : v >= b ? "lv-bad" : v >= w ? "lv-warn" : "lv-ok");
+const RING = 2 * Math.PI * 15;
+function sysStats(st) {
+  const box = $("#sysg"), menu = $("#menu-sys");
+  box.hidden = menu.hidden = !st;
+  if (!st) return;
+  for (const k of ["cpu", "ram", "sd"]) {
+    const v = st[k], g = box.querySelector(`[data-k="${k}"]`);
+    g.className = "g " + lvl(v, 60, 85);
+    g.querySelector(".fg").style.strokeDasharray = `${(RING * (v ?? 0)) / 100} ${RING}`;
+    g.querySelector("text").textContent = v ?? "–";
+    const m = $("#ms-" + k); m.textContent = `${k.toUpperCase()} ${v ?? "–"}%`; m.className = lvl(v, 60, 85);
+  }
+  const t = st.temp, tl = lvl(t, 70, 80), te = $("#sys-temp");
+  te.className = "t " + tl; te.querySelector("b").textContent = t == null ? "–" : `${Math.round(t)}°`;
+  te.hidden = t == null;
+  const mt = $("#ms-temp"); mt.textContent = t == null ? "" : `${Math.round(t)} °C`; mt.className = tl; mt.hidden = t == null;
 }
 function setOnline(on) {
   const c = $("#conn"), t = on ? "Box online" : "Box offline";

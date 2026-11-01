@@ -421,3 +421,65 @@ def power(action: str) -> None:
 def status() -> dict:
     return {"wifi": wifi_status(), "bt": bt_status(), "audio": audio_status(),
             "spotify": spotify_status(), "airplay": airplay_status(), "system": system_info()}
+
+
+# --- vyťaženie Pi pre hlavičku ovládania (CPU, RAM, SD, teplota) -------------------------------
+
+class SysStats:
+    """Lacné čítanie z /proc a /sys, výsledok sa drží `ttl` sekúnd (WebSocket sa pýta často)."""
+
+    def __init__(self, ttl: float = 2.0, proc: Path = Path("/proc"),
+                 thermal: Path = Path("/sys/class/thermal/thermal_zone0/temp"), disk: str = "/"):
+        self.ttl, self.proc, self.thermal, self.disk = ttl, proc, thermal, disk
+        self._cpu_prev: tuple[int, int] | None = None
+        self._at = 0.0
+        self._val: dict | None = None
+        self._lock = threading.Lock()
+
+    def _cpu(self) -> int | None:
+        try:
+            parts = (self.proc / "stat").read_text().split("\n", 1)[0].split()[1:]
+            nums = [int(x) for x in parts]
+        except (OSError, ValueError, IndexError):
+            return None
+        idle = nums[3] + (nums[4] if len(nums) > 4 else 0)      # idle + iowait
+        total = sum(nums[:8])
+        prev, self._cpu_prev = self._cpu_prev, (idle, total)
+        if not prev or total <= prev[1]:
+            return None
+        return round(100 * (1 - (idle - prev[0]) / (total - prev[1])))
+
+    def _ram(self) -> int | None:
+        try:
+            info = dict(line.split(":", 1) for line in (self.proc / "meminfo").read_text().splitlines() if ":" in line)
+            total = int(info["MemTotal"].split()[0])
+            avail = int(info["MemAvailable"].split()[0])
+        except (OSError, KeyError, ValueError):
+            return None
+        return round(100 * (1 - avail / total)) if total else None
+
+    def _sd(self) -> int | None:
+        try:
+            u = shutil.disk_usage(self.disk)
+        except OSError:
+            return None
+        return round(100 * u.used / u.total) if u.total else None
+
+    def _temp(self) -> float | None:
+        try:
+            return round(int(self.thermal.read_text().strip()) / 1000, 1)
+        except (OSError, ValueError):
+            return None
+
+    def get(self) -> dict | None:
+        with self._lock:
+            now = time.monotonic()
+            if self._val is None or now - self._at >= self.ttl:
+                cpu = self._cpu()
+                if cpu is None and self._val is None:
+                    cpu = self._cpu() if self._cpu_prev else None
+                v = {"cpu": cpu if cpu is not None else (self._val or {}).get("cpu"),
+                     "ram": self._ram(), "sd": self._sd(), "temp": self._temp()}
+                self._val = v if any(x is not None for x in v.values()) else None
+                self._at = now
+            return self._val

@@ -159,3 +159,27 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
   font-size: 11px; font-weight: 700; color: var(--muted); }
 #spec { flex: 1; width: 100%; height: 104px; min-width: 0; display: block; }
 .spec-axis { display: flex; justify-content: space-between; padding-left: 22px; font-size: 10px; letter-spacing: .08em; color: var(--muted); }
+
+/* vyťaženie Pi v hlavičke (krúžky) */
+.sysg { display: flex; gap: 8px; align-items: center; flex: none; }
+.sysg[hidden] { display: none; }
+.sysg .g { display: grid; justify-items: center; gap: 1px; }
+.sysg svg { width: 38px; height: 38px; }
+.sysg circle { fill: none; stroke-width: 4; }
+.sysg circle.bg { stroke: var(--line); }
+.sysg circle.fg { stroke: var(--ok); stroke-linecap: round; stroke-dasharray: 0 100; transition: stroke-dasharray .6s, stroke .3s; }
+.sysg text { text-anchor: middle; font: 700 10px system-ui, sans-serif; fill: var(--text); }
+.sysg small { font-size: 9px; letter-spacing: .08em; color: var(--muted); }
+.sysg .t { display: grid; justify-items: center; font-size: 9px; letter-spacing: .08em; color: var(--muted);
+  padding-left: 6px; border-left: 1px solid var(--line); }
+.sysg .t b { font-size: 13px; letter-spacing: 0; color: var(--ok); font-variant-numeric: tabular-nums; }
+.lv-warn { --lv: var(--warn); } .lv-bad { --lv: #ff4d4d; } .lv-ok { --lv: var(--ok); }
+.sysg .g.lv-warn circle.fg, .sysg .g.lv-bad circle.fg { stroke: var(--lv); }
+.sysg .t.lv-warn b, .sysg .t.lv-bad b { color: var(--lv); }
+.menu-st .pi { display: grid; gap: 6px; margin-top: 4px; }
+.menu-st .pi span { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.menu-st .pi b { text-align: center; }
+.menu-st .pi b.lv-ok { background: #11331f; color: var(--ok); }
+.menu-st .pi b.lv-warn { background: #33270a; color: var(--warn); }
+.menu-st .pi b.lv-bad { background: #3a1616; color: #ff6b6b; }
+@media (max-width: 640px) { .sysg { display: none !important; } }

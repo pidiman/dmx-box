@@ -180,6 +180,8 @@ def create_app(box) -> FastAPI:
         resp.delete_cookie(COOKIE)
         return resp
 
+    sysstats = system.SysStats()
+
     def snapshot() -> dict[str, Any]:
         a = box.analyzer.snapshot()
         st = box.engine.status
@@ -202,6 +204,7 @@ def create_app(box) -> FastAPI:
             "line_in": box.line_in.on,
             "viz": {"l": [int(x * 99) for x in a.viz_l], "r": [int(x * 99) for x in a.viz_r]},   # 0–99, menšie správy
             "track": box.nowplaying.track.as_dict() if getattr(box, "nowplaying", None) else None,
+            "sys": sysstats.get(),
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},

@@ -616,3 +616,17 @@ def test_airplay_title_after_missed_start():
         return x + "</item>\n"
     np_.airplay.feed(item("core", "minm", "Strobe") + item("core", "asar", "deadmau5"))
     assert np_.track.title == "Strobe" and np_.track.status == "playing"
+
+
+def test_sys_stats(tmp_path):
+    from dmxbox.system import SysStats
+    (tmp_path / "stat").write_text("cpu  100 0 100 800 0 0 0 0 0 0\n")
+    (tmp_path / "meminfo").write_text("MemTotal: 1000 kB\nMemFree: 100 kB\nMemAvailable: 250 kB\n")
+    (tmp_path / "temp").write_text("52437\n")
+    s = SysStats(ttl=0, proc=tmp_path, thermal=tmp_path / "temp", disk=str(tmp_path))
+    v = s.get()
+    assert v["ram"] == 75 and v["temp"] == 52.4 and 0 <= v["sd"] <= 100
+    (tmp_path / "stat").write_text("cpu  150 0 150 900 0 0 0 0 0 0\n")        # +100 práca, +100 idle
+    assert s.get()["cpu"] == 50
+    missing = SysStats(ttl=0, proc=tmp_path / "nie", thermal=tmp_path / "nie", disk="/nie/je")
+    assert missing.get() is None
