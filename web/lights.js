@@ -254,7 +254,7 @@ function renderProfiler() {
         Object.entries(rig.types).map(([k, v]) => h("option", { value: k, selected: k === draft.type }, v)))),
       h("label", { class: "f" }, "Počet kanálov", count)),
     h("label", { class: "f" }, "Názov módu (nepovinné)", h("input", { type: "text", value: draft.mode, placeholder: `${draft.channels.length}ch`, oninput: (ev) => { draft.mode = ev.target.value; } })),
-    draft.channels.map((c, i) => h("div", { class: "chrow" }, h("b", {}, `Kanál ${i + 1}`),
+    ...draft.channels.map((c, i) => h("div", { class: "chrow" }, h("b", {}, `Kanál ${i + 1}`),
       h("select", { onchange: (ev) => { c.fn = ev.target.value; } }, fnOpts(c.fn)),
       h("input", { type: "text", placeholder: "vlastný názov", value: c.name || "", oninput: (ev) => { c.name = ev.target.value; } }))),
     h("div", { class: "row2" },
