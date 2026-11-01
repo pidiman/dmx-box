@@ -170,6 +170,8 @@ function renderDmx() {
   const d = sys.dmx;
   g.append(item(lbl("DMX dongle", d.driver === "dry" ? "naprázdno (test bez donglu)" : d.connected ? "pripojený" : "nenájdený – skontroluj USB", d.connected && d.driver !== "dry" ? "ok" : "")));
   g.append(item(lbl("Svetlá", d.fixtures.join(", ")), h("a", { class: "pill", href: "viz.html" }, "Náhľad")));
+  g.append(h("a", { class: "item", href: "lights.html", style: "text-decoration:none;color:inherit" },
+    lbl("Spravovať svetlá", "pridať, upraviť, zmazať, adresy, značky, test kanálov"), h("span", { class: "pill" }, "Otvoriť →")));
 }
 
 function renderSys() {

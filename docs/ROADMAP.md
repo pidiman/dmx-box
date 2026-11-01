@@ -7,7 +7,13 @@
 - [ ] Doladiť efekty na skutočnej hudbe (vizualizácia `viz.html` + svetlá)
 - [ ] Overiť rozpoznanie štýlu na reálnych skladbách (pravidlá sú ladené na syntetických vzoroch) a doladiť prahy v `genre.py`
 
-## Odložené: správa svetiel (pridať / odobrať / adresy z UI)
+## Správa svetiel (pridať / odobrať / adresy z UI)
+
+**Fáza 1 hotová:** knižnica modelov `profiles/`, zoznam `rig.yaml` so značkami, kontrola prekrývania, stránka Svetlá (mapa kanálov, pridať/upraviť/vypnúť/zmazať, identifikovať, test kanálov, nový model, export/import), nové svetlá ovládané podľa funkcií kanálov.
+
+**Fáza 2:** efekty rozložené podľa pozícií (chase zľava doprava, zrkadlové hlavy), viz.html poskladané zo zoznamu.
+
+Pôvodný plán:
 
 Cieľ: svetlá a adresy sa nastavujú z tabletu, dajú sa pridať nové modely aj viac kusov rovnakého svetla.
 

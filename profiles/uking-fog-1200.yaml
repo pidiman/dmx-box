@@ -1,0 +1,12 @@
+id: uking-fog-1200
+name: U'King 1200W Fog Machine (6 LED)
+manufacturer: U'King
+type: fog
+notes: DMX nepotvrdené manuálom – manuál uvádza len diaľkový ovládač. Pred zapojením overiť konektor.
+modes:
+  4ch:
+    channels:
+      - {name: fog, fn: fog}              # 0 = vyp, 255 = dym
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}

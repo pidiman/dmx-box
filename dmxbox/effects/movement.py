@@ -11,7 +11,7 @@ import random
 
 from . import Ctx, Look
 
-# (pan, tilt) 0–1, rozmiestnené po miestnosti; tilt limituje fixtures.yaml
+# (pan, tilt) 0–1, rozmiestnené po miestnosti; tilt limituje rig.yaml (limits)
 POSITIONS = [
     (0.20, 0.55), (0.35, 0.40), (0.50, 0.60), (0.65, 0.40), (0.80, 0.55),
     (0.70, 0.70), (0.55, 0.35), (0.40, 0.70), (0.25, 0.35), (0.50, 0.45),

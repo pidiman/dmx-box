@@ -194,7 +194,8 @@ Treba Spotify Premium a internet. V režime hotspot internet nie je, preto tam o
 | Súbor | Čo v ňom je | Po zmene |
 | --- | --- | --- |
 | `config.yaml` | audio, DMX ovládač a počet kanálov, port webu, light delay | `dmxbox restart` |
-| `fixtures.yaml` | svetlá, DMX adresy, kanály | `dmxbox restart` |
+| `rig.yaml` | môj zoznam svetiel (značky, modely, adresy) – vytvorí ho appka z `rig.default.yaml` | mení appka (Svetlá), netreba reštart |
+| `profiles/*.yaml`, `profiles/user/` | modely svetiel (kanály podľa manuálu); `user/` = vytvorené v appke | `dmxbox restart` pri ručnej úprave |
 | `presets.json` | 50 presetov z UI | nemeniť ručne |
 | `security.json` | PIN appky (hash) a či sa vyžaduje | `dmxbox pin status / off / reset` |
 | `scenario.json` | posledný scenár („Ako minule“) | nemeniť ručne |

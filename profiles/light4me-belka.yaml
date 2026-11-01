@@ -1,0 +1,22 @@
+id: light4me-belka
+name: Light4Me BELKA Laser Strobe LED PAR Derby UV
+manufacturer: Light4Me
+type: effect
+notes: Strobo a UV sú jeden LED modul – kanál 11 = jas modulu, kanál 12 = rýchlosť blikania (0 = stály UV).
+modes:
+  12ch:
+    channels:
+      - {name: derby_red, fn: red}
+      - {name: derby_green, fn: green}
+      - {name: derby_blue, fn: blue}
+      - {name: derby_white, fn: white}
+      - {name: derby_motor, fn: motor}
+      - {name: par_red, fn: red}
+      - {name: par_green, fn: green}
+      - {name: par_blue, fn: blue}
+      - {name: par_white, fn: white}
+      - {name: laser, fn: laser}          # 0–63 vyp | 64–127 červený | 128–197 zelený | 198–255 oba
+      - {name: strobe_uv, fn: uv}         # jas strobo/UV modulu
+      - {name: strobe_speed, fn: strobe}  # 0 = svieti stále
+    ranges:
+      laser: {off: [0, 63], red: [64, 127], green: [128, 197], both: [198, 255]}

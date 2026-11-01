@@ -15,11 +15,20 @@ from dmxbox.dmx_out import DMXOut  # noqa: E402
 from dmxbox.effects.color import COLOR_FX  # noqa: E402
 from dmxbox.effects.movement import MOVE_FX  # noqa: E402
 from dmxbox.engine import Engine  # noqa: E402
-from dmxbox.fixtures import load_rig  # noqa: E402
 from dmxbox.sim import synth_source  # noqa: E402
 from dmxbox.fog import FogController  # noqa: E402
 from dmxbox.state import Store  # noqa: E402
 from dmxbox.styles import LOOKS  # noqa: E402
+
+
+def rig_all():
+    """Všetky svetlá z predvoleného zoznamu vrátane vypnutého dymostroja (testy dymu)."""
+    from dmxbox.fixtures import RigStore
+    rs = RigStore(Path("/nonexistent-rig.yaml"))
+    entries = rs.load_entries()
+    for e in entries:
+        e["enabled"] = True
+    return rs.build(entries)
 
 
 def run_analyzer(bpm: float, seconds: float = 14, **kw) -> Analyzer:
@@ -63,7 +72,7 @@ def test_silence_detected():
 
 @pytest.fixture
 def engine(tmp_path):
-    rig = load_rig()
+    rig = rig_all()
     an = run_analyzer(128, seconds=8)
     store = Store(tmp_path / "presets.json")
     return Engine(rig, an, store, DMXOut(driver="dry")), an, store
@@ -131,7 +140,7 @@ def test_api(tmp_path, monkeypatch):
     from dmxbox.audio_ctl import LineIn
     from dmxbox.main import Box
 
-    rig = load_rig()
+    rig = rig_all()
     an = run_analyzer(120, seconds=6)
     store = Store(tmp_path / "p.json")
     out = DMXOut(driver="dry")
@@ -276,7 +285,7 @@ def test_api_style(tmp_path):
     from dmxbox.audio_ctl import LineIn
     from dmxbox.main import Box
 
-    rig = load_rig()
+    rig = rig_all()
     an = run_analyzer(120, seconds=6)
     store = Store(tmp_path / "p.json")
     out = DMXOut(driver="dry")
@@ -297,7 +306,7 @@ def _box(tmp_path):
     from dmxbox.scenario import ScenarioStore
     from dmxbox.sim import mix_source
 
-    rig = load_rig()
+    rig = rig_all()
     an = run_analyzer(120, seconds=6)
     store = Store(tmp_path / "p.json")
     out = DMXOut(driver="dry")
@@ -464,3 +473,88 @@ def test_airplay_metadata_and_scenario(tmp_path):
     assert "airplay" in c.get("/api/system").json()
     r = c.post("/api/scenario", json={"id": "airplay", "style": "auto"}).json()
     assert r["ok"]                           # bez shairport-sync len varovanie, scenár beží
+
+
+# --- správa svetiel ------------------------------------------------------------------
+
+def test_rig_validation_rules():
+    from dmxbox import fixtures as fx
+
+    prof = fx.load_profiles()
+    base = [{"id": "a", "label": "SVETLO1", "profile": "max-partybar4", "mode": "8ch", "address": 1},
+            {"id": "b", "label": "SVETLO2", "profile": "light4me-belka", "mode": "12ch", "address": 21}]
+    assert fx.validate(base, prof) == []
+    clash = base + [{"id": "c", "label": "PAR1", "profile": "generic-rgbw-par", "mode": "4ch", "address": 30}]
+    err = fx.validate(clash, prof)
+    assert err and "30–32" in err[0] and "SVETLO2" in err[0]           # presne ktoré kanály
+    assert fx.validate(base + [{"id": "c", "label": "svetlo1", "profile": "generic-rgb-par",
+                                "mode": "3ch", "address": 100}], prof)  # značka bez ohľadu na… (malé písmená neplatné)
+    assert fx.validate(base + [{"id": "c", "label": "SVETLO1", "profile": "generic-rgb-par",
+                                "mode": "3ch", "address": 100}], prof)  # duplicitná značka
+    assert fx.validate(base + [{"id": "c", "label": "X", "profile": "generic-rgb-par",
+                                "mode": "3ch", "address": 511}], prof)  # mimo 512
+    mirror = base + [{"id": "c", "label": "BELKA2", "profile": "light4me-belka", "mode": "12ch",
+                      "address": 21, "mirror": True}]
+    assert fx.validate(mirror, prof) == []                              # zámerné zrkadlenie
+    assert fx.free_address(base, prof, 4) == 9                          # medzera 9–20
+    assert fx.free_address(base, prof, 16) == 33
+
+
+def test_rig_api_add_edit_delete_identify(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from dmxbox.api import create_app
+    from dmxbox.fixtures import ROOT, RigStore
+
+    box = _box(tmp_path)
+    box.rig_store = RigStore(tmp_path / "rig.yaml", ROOT / "rig.default.yaml")
+    c = TestClient(create_app(box))
+    d = c.get("/api/rig").json()
+    assert [f["label"] for f in d["fixtures"]] == ["SVETLO1", "SVETLO2", "SVETLO3", "DYM1"]
+    assert d["errors"] == [] and any(p["id"] == "generic-rgbw-par" for p in d["profiles"])
+
+    chk = c.post("/api/rig/check", json={"label": "PAR1", "profile": "generic-rgbw-par", "mode": "8ch",
+                                         "address": 25}).json()
+    assert chk["errors"] and chk["free"] == 37 and chk["footprint"] == 8
+    bad = c.post("/api/rig/fixture", json={"label": "PAR1", "profile": "generic-rgbw-par", "mode": "8ch",
+                                           "address": 25})
+    assert bad.status_code == 400 and "prekrýva" in bad.json()["detail"]
+    ok = c.post("/api/rig/fixture", json={"label": "par1", "name": "PAR vľavo", "profile": "generic-rgbw-par",
+                                          "mode": "8ch", "address": 37, "position": "left"})
+    assert ok.status_code == 200
+    new = next(f for f in ok.json()["fixtures"] if f["label"] == "PAR1")   # značka veľkými
+    assert new["id"] == "fx1" and new["end"] == 44
+    assert "fx1" in box.engine.rig                                         # engine hneď vidí nové svetlo
+
+    # nové svetlo dostáva farby a jas podľa funkcií kanálov
+    a = box.analyzer.snapshot()
+    a.silent = False
+    box.store.update(auto=False, color_fx="color_step", move_fx="hold", master=1.0)
+    f = box.engine.compute(a, 1.0)
+    assert f[36] > 0 and any(f[37:41])                                     # dimmer 37, RGBW 38–41
+
+    assert c.put("/api/rig/fixture/fx1", json={"address": 1}).status_code == 400   # kolízia s lištou
+    assert c.put("/api/rig/fixture/belka", json={"label": "BELKA", "enabled": False}).status_code == 200
+    assert "belka" not in box.engine.rig
+    assert (tmp_path / "rig.backup").exists()                              # záloha pred zmenou
+
+    assert c.post("/api/rig/identify/fx1").status_code == 200
+    import time as _t
+    f = box.engine.compute(a, _t.monotonic())
+    assert not any(f[:8]) and not any(f[11:36])                            # svieti len PAR1 (hlava len stojí)
+
+    assert c.post("/api/rig/test/fx1", json={"red": 255, "nonsense": 9}).status_code == 200
+    f = box.engine.compute(a, _t.monotonic())
+    assert f[37] == 255 and sum(f[36:44]) == 255 and not any(f[:8])
+    c.post("/api/rig/test-stop")
+
+    prof = c.post("/api/rig/profile", json={"name": "Môj laser", "type": "effect",
+                                            "channels": [{"fn": "laser"}, {"fn": "speed"}]}).json()
+    assert prof["created"] == "moj-laser"
+    exp = c.get("/api/rig/export").json()
+    assert "moj-laser" in exp["profiles"]
+    assert c.delete("/api/rig/fixture/fx1").status_code == 200
+    assert "fx1" not in box.engine.rig
+    assert c.post("/api/rig/import", json=exp).status_code == 200          # obnova zo zálohy
+    import shutil
+    shutil.rmtree(ROOT / "profiles" / "user", ignore_errors=True)

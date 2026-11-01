@@ -23,7 +23,8 @@ DEFAULTS: dict = {
     "output": {"mode": "cable", "light_delay_ms": 0},
     "web": {"host": "0.0.0.0", "port": 80},
     "presets_file": "presets.json",
-    "fixtures_file": "fixtures.yaml",
+    "fixtures_file": "fixtures.yaml",   # zastarané – svetlá sú v rig.yaml (appka: Svetlá)
+    "rig_file": "rig.yaml",
     "scenario_file": "scenario.json",
     "security_file": "security.json",
 }

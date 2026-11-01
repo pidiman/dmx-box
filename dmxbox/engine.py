@@ -27,7 +27,7 @@ from .styles import LOOKS, StyleLook, look_for
 
 log = logging.getLogger("dmxbox.engine")
 
-# farby kolieska moving headu (fixtures.yaml → values.color) ako RGB
+# farby kolieska moving headu (profil → values.color) ako RGB
 HEAD_WHEEL = {
     "white": (1, 1, 1), "red": (1, 0, 0), "yellow": (1, 1, 0), "blue": (0, 0, 1),
     "green": (0, 1, 0), "orange": (1, 0.5, 0), "pink": (1, 0, 1), "cyan": (0, 1, 1),
@@ -60,6 +60,8 @@ class Engine(threading.Thread):
         self.last_frame = bytearray(512)
         self.fog = FogController()
         self._drop_count = 0
+        self.identify: tuple | None = None      # (Fixture, do kedy) – svetlo bliká na bielo
+        self.test: tuple | None = None          # (Fixture, {kanál: hodnota}, do kedy) – test kanálov z appky
         self._drop_beat = -1e9      # beat, kedy začal posledný drop
 
     def stop(self) -> None:
@@ -129,12 +131,71 @@ class Engine(threading.Thread):
 
         frame = self.rig.new_frame()
         self._write(frame, L, s.master, strobe=s.strobe or drop_strobe)
+        self._write_generic(frame, L, s.master, strobe=s.strobe or drop_strobe, fog_on=fog_on)
         self._write_fog(frame, L, fog_on, s.master)
         if s.blackout:
             frame = self.rig.new_frame()
             self._write_safe_defaults(frame)
+        frame = self._overrides(frame, now)
         self.status.frame += 1
         return frame
+
+    # --- identifikácia a test kanálov (správa svetiel) ---------------------------------------
+    def _overrides(self, frame: bytearray, now: float) -> bytearray:
+        if self.test and now < self.test[2]:
+            fx, vals, _ = self.test
+            frame = self.rig.new_frame()
+            self._write_safe_defaults(frame)
+            for ch, v in vals.items():
+                fx.set(frame, ch, v)
+            return frame
+        if self.identify and now < self.identify[1]:
+            fx = self.identify[0]
+            frame = self.rig.new_frame()
+            self._write_safe_defaults(frame)
+            on = int(now * 4) % 2 == 0          # 2× za sekundu, aby bolo jasné, ktoré svieti
+            for ch, fn in fx.fns.items():
+                if fn in ("dimmer", "red", "green", "blue", "white", "amber"):
+                    fx.set(frame, ch, 255 if on else 0)
+                elif fn in ("pan", "tilt"):
+                    fx.set(frame, ch, fx.limit(fn, 128))
+            return frame
+        return frame
+
+    # --- ďalšie svetlá podľa funkcií kanálov (pridané v appke) --------------------------------
+    KNOWN = ("parbar", "movinghead", "belka", "fog")
+
+    def _write_generic(self, f: bytearray, L: Look, master: float, strobe: bool, fog_on: bool) -> None:
+        m = max(0.0, min(1.0, master))
+        for i, fx in enumerate(v for k, v in self.rig.fx.items() if k not in self.KNOWN):
+            head = fx.type == "moving_head"
+            color = L.head_color if head else L.derby if fx.type == "effect" else (L.par if i % 2 == 0 else L.bar)
+            dim = L.head_dim if head else L.bar_dim
+            has_dimmer = bool(fx.by_fn("dimmer"))
+            k = 1.0 if has_dimmer else dim * m
+            rgbw = {"red": color[0], "green": color[1], "blue": color[2], "white": color[3]}
+            for ch, fn in fx.fns.items():
+                if fn in rgbw:
+                    fx.set(f, ch, 255 * rgbw[fn] * k)
+                elif fn == "dimmer":
+                    fx.set(f, ch, 255 * (1.0 if strobe else dim) * m)
+                elif fn == "strobe":
+                    fx.set(f, ch, 200 if strobe else 0)
+                elif fn == "uv":
+                    fx.set(f, ch, 255 * L.strobe_uv * m)
+                elif fn in ("pan", "tilt"):
+                    fx.set(f, ch, fx.limit(fn, 255 * (L.pan if fn == "pan" else L.tilt)))
+                elif fn == "pt_speed":
+                    fx.set(f, ch, 255 * L.pt_speed)
+                elif fn == "color_wheel" and fx.values.get("color"):
+                    fx.set(f, ch, self._wheel(fx, L.head_color))
+                elif fn == "gobo" and fx.values.get("gobo"):
+                    fx.set(f, ch, self._gobo(fx, L.gobo, L.gobo_mode))
+                elif fn == "motor":
+                    fx.set(f, ch, 255 * L.derby_motor if any(L.derby) else 0)
+                elif fn == "fog":
+                    fx.set(f, ch, 255 if fog_on else 0)
+                # ostatné (makro, program, reset, efekt, iné) ostávajú 0 = DMX režim
 
     def _pick_fx(self, s, a: AudioState, bar: int, look: StyleLook, section: str) -> tuple[str, str]:
         if not s.auto:

@@ -1,0 +1,20 @@
+id: generic-rgb-par
+name: Všeobecný RGB PAR
+manufacturer: —
+type: par
+notes: Over poradie kanálov v manuáli svojho svetla.
+modes:
+  3ch:
+    channels:
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}
+  7ch:
+    channels:
+      - {name: dimmer, fn: dimmer}
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}
+      - {name: strobe, fn: strobe}
+      - {name: program, fn: program}
+      - {name: speed, fn: speed}

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b12">
+  <title>Svetlá</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="start.css">
+  <style>
+    .chmap { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; padding: 12px; }
+    .chmap span { height: 26px; border-radius: 4px; background: #1d1d2c; font-size: 9px; color: #8a8aa3;
+      display: grid; place-items: center; overflow: hidden; white-space: nowrap; }
+    .chmap span.used { color: #0b0b12; font-weight: 700; }
+    .chmap span.off { opacity: .45; }
+    .chmap span.bad { background: #ff4d4d !important; color: #fff; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+    .tag-l { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px; background: #1d1d2c; font-size: 12px; }
+    .tag-l i { width: 10px; height: 10px; border-radius: 3px; }
+    .fx-card { display: grid; gap: 8px; padding: 14px 16px; }
+    .fx-card + .fx-card { border-top: 1px solid var(--line); }
+    .fx-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .label-chip { padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 14px; letter-spacing: .04em; color: #0b0b12; }
+    .fx-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fx-acts button { min-height: 38px; padding: 0 12px; font-size: 13px; }
+    .banner { padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; }
+    .banner.bad { background: #3a1616; color: #ffb3b3; }
+    .banner.warn { background: #33270a; color: #ffd27a; }
+    .banner.ok { background: #10261b; color: #6be3a0; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    label.f { display: grid; gap: 4px; font-size: 13px; color: #a3a3b8; }
+    select.full { width: 100%; }
+    .chrow { display: grid; grid-template-columns: 54px 1fr 1fr; gap: 6px; align-items: center; font-size: 13px; }
+    .slider { display: grid; grid-template-columns: 1fr 44px; gap: 8px; align-items: center; font-size: 13px; }
+    .slider small { color: #a3a3b8; }
+    .addbtn { width: 100%; min-height: 52px; font-weight: 700; background: var(--accent); border-color: var(--accent); color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="bar">
+      <a class="back" href="box.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Nastavenia boxu</a>
+      <a class="pill" href="/ovladanie">Ovládanie →</a>
+    </div>
+    <h1>Svetlá</h1>
+    <p class="hint">Tvoj zoznam svetiel a DMX zariadení. Box kontroluje, aby sa adresy a kanály neprekrývali. Pred každou zmenou sa zoznam zálohuje.</p>
+
+    <div id="banners"></div>
+
+    <h2 class="sec-title">Mapa kanálov</h2>
+    <div class="group"><div class="chmap" id="chmap"></div><div class="legend" id="legend"></div></div>
+
+    <h2 class="sec-title">Môj zoznam</h2>
+    <div class="group" id="list"></div>
+    <button class="addbtn" id="add">+ Pridať svetlo</button>
+
+    <section id="editor" hidden>
+      <h2 class="sec-title" id="ed-title">Nové svetlo</h2>
+      <div class="group"><div class="form" id="ed-form"></div></div>
+    </section>
+
+    <section id="tester" hidden>
+      <h2 class="sec-title" id="ts-title">Test kanálov</h2>
+      <div class="group"><div class="form" id="ts-form"></div></div>
+    </section>
+
+    <section id="profiler" hidden>
+      <h2 class="sec-title">Nový model svetla</h2>
+      <div class="group"><div class="form" id="pr-form"></div></div>
+    </section>
+
+    <h2 class="sec-title">Záloha</h2>
+    <div class="group">
+      <div class="item"><div class="l"><b>Exportovať zoznam</b><small>stiahne súbor so svetlami aj vlastnými modelmi</small></div><button id="export">Export</button></div>
+      <div class="item"><div class="l"><b>Importovať zoznam</b><small>nahradí terajší zoznam (stará verzia ostane v zálohe)</small></div>
+        <label class="pill" style="min-height:36px;display:grid;place-items:center;padding:0 12px;cursor:pointer">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
+    </div>
+  </div>
+  <div id="toast" role="status"></div>
+  <script src="lights.js"></script>
+</body>
+</html>

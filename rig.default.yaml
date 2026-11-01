@@ -1,0 +1,10 @@
+# DMX-BOX – môj zoznam svetiel (univerz 1). Upravuje sa v appke: Nastavenia boxu → Svetlá.
+# Toto je predvolený zoznam; appka si pri prvom spustení vytvorí rig.yaml a mení už len ten.
+# id = meno pre engine (parbar/movinghead/belka/fog majú vlastné efekty), label = tvoja značka.
+fixtures:
+  - {id: parbar, label: SVETLO1, name: PartyBar4, profile: max-partybar4, mode: 8ch, address: 1, position: center}
+  - {id: movinghead, label: SVETLO2, name: Moving head, profile: fractal-gobo-spot-30, mode: 12ch, address: 9,
+     position: center, limits: {tilt: [40, 200]}}   # tilt: aby nesvietil do očí / do stropu
+  - {id: belka, label: SVETLO3, name: Belka, profile: light4me-belka, mode: 12ch, address: 21, position: center}
+  - {id: fog, label: DYM1, name: Dymostroj, profile: uking-fog-1200, mode: 4ch, address: 33, position: center,
+     enabled: false}   # DMX nepotvrdené (manuál uvádza len ovládač) – zapni až po overení konektora

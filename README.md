@@ -19,7 +19,7 @@ Samostatná krabička na **Raspberry Pi 3B+** inšpirovaná ADJ myDMX GO. Prijí
 | Light4Me BELKA Laser Strobe LED PAR Derby UV | 12CH | 21 (21–32) |
 | U'King 1200W Fog Machine (6 LED) | 4CH (dym + RGB) | 33 (33–36) |
 
-Kanálové mapy: [`fixtures.yaml`](fixtures.yaml).
+Svetlá a adresy sa spravujú v appke (**Nastavenia boxu → Spravovať svetlá**): vlastné značky (SVETLO1…), pridanie, úprava, zmazanie, kontrola prekrývania kanálov, test kanálov. Modely svetiel sú v [`profiles/`](profiles), predvolený zoznam v [`rig.default.yaml`](rig.default.yaml).
 
 ## Dokumentácia
 

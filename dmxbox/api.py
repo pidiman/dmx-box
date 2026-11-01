@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from . import scenario as scen
 from .auth import COOKIE, MAX_AGE, Auth, PinError
+from . import fixtures as fxlib
 from . import system
 from .config import ROOT
 from .effects.color import COLOR_FX, PALETTES
@@ -349,7 +350,7 @@ def create_app(box) -> FastAPI:
     def sys_status():
         st = system.status()
         st["dmx"] = {"driver": box.out.driver, "connected": box.out.connected,
-                     "fixtures": [f.name for f in box.engine.rig.fx.values()]}
+                     "fixtures": [f"{f.label} {f.name}".strip() for f in box.engine.rig.fx.values()]}
         return st
 
     @app.get("/api/system/wifi/scan")
@@ -434,6 +435,192 @@ def create_app(box) -> FastAPI:
     @app.post("/api/system/power")
     def power(body: TextBody):
         return _cmd(system.power, body.value)
+
+    # --- správa svetiel (Nastavenia boxu → Svetlá) -------------------------------------
+    rig_store = getattr(box, "rig_store", None)
+    dongle_limit = box.out.channels
+
+    def rig_state(extra: dict | None = None) -> dict:
+        profiles = fxlib.load_profiles()
+        entries = rig_store.load_entries() if rig_store else []
+        fixtures = []
+        for e in entries:
+            prof = profiles.get(e.get("profile"), {})
+            try:
+                n = fxlib.footprint_of(e, profiles)
+            except fxlib.RigError:
+                n = 0
+            a = int(e.get("address", 0))
+            fixtures.append({**e, "enabled": e.get("enabled", True), "footprint": n, "end": a + n - 1,
+                             "model": prof.get("name", e.get("profile")), "type": prof.get("type", "other")})
+        return {"fixtures": fixtures, "map": fxlib.channel_map(entries, profiles),
+                "errors": fxlib.validate(entries, profiles), "dongle_limit": dongle_limit,
+                "profiles": [{"id": p["id"], "name": p["name"], "type": p.get("type", "other"),
+                              "user": p.get("user", False), "notes": p.get("notes", ""),
+                              "modes": {m: [{"name": c["name"], "fn": c.get("fn", "other")} for c in v.get("channels", [])]
+                                        for m, v in (p.get("modes") or {}).items()}}
+                             for p in profiles.values()],
+                "functions": fxlib.FUNCTIONS, "types": fxlib.TYPES, "positions": fxlib.POSITIONS, **(extra or {})}
+
+    def need_store():
+        if not rig_store:
+            raise HTTPException(503, "správa svetiel nie je dostupná")
+
+    def apply_rig(entries: list[dict]) -> dict:
+        try:
+            rig_store.save(entries)
+        except fxlib.RigError as e:
+            raise HTTPException(400, str(e)) from e
+        rig = rig_store.build()
+        box.engine.rig = rig
+        warn = None
+        end = max((f.start + f.footprint - 1 for f in rig.fx.values()), default=0)
+        if end > box.out.channels:
+            box.out.channels = min(512, -(-end // 8) * 8)
+        if end > dongle_limit:
+            warn = (f"Svetlá siahajú po kanál {end}. Lacný USB-DMX dongle (uDMX) spoľahlivo zvláda asi "
+                    f"{dongle_limit} kanálov – ak by svetlá blikali alebo zamŕzali, posuň adresy nižšie.")
+        return rig_state({"warning": warn})
+
+    def clean(body: dict, existing: dict | None = None) -> dict:
+        e = dict(existing or {})
+        for k in ("label", "name", "profile", "mode", "position"):
+            if k in body and body[k] is not None:
+                e[k] = str(body[k]).strip()
+        if "label" in e:
+            e["label"] = e["label"].upper()
+        if "address" in body:
+            try:
+                e["address"] = int(body["address"])
+            except (TypeError, ValueError) as ex:
+                raise HTTPException(400, "adresa musí byť číslo") from ex
+        for k in ("enabled", "mirror"):
+            if k in body:
+                e[k] = bool(body[k])
+        if e.get("position") not in fxlib.POSITIONS:
+            e["position"] = "center"
+        return e
+
+    @app.get("/api/rig")
+    def get_rig():
+        need_store()
+        return rig_state()
+
+    @app.post("/api/rig/check")
+    def check_rig(body: Patch):
+        """Kontrola bez uloženia (appka ju volá pri písaní adresy)."""
+        need_store()
+        data = body.model_dump()
+        entries = rig_store.load_entries()
+        fid = data.get("id")
+        cur = next((e for e in entries if e.get("id") == fid), None)
+        cand = clean(data, cur)
+        cand.setdefault("id", "novy")
+        others = [e for e in entries if e.get("id") != fid]
+        profiles = fxlib.load_profiles()
+        errors = fxlib.validate(others + [cand], profiles)
+        try:
+            n = fxlib.footprint_of(cand, profiles)
+        except fxlib.RigError:
+            n = 0
+        return {"errors": errors, "footprint": n,
+                "free": fxlib.free_address(others, profiles, n) if n else None}
+
+    @app.post("/api/rig/fixture")
+    def add_fixture(body: Patch):
+        need_store()
+        entries = rig_store.load_entries()
+        ids = {e["id"] for e in entries}
+        n = 1
+        while f"fx{n}" in ids:
+            n += 1
+        e = clean(body.model_dump())
+        e["id"] = f"fx{n}"
+        e.setdefault("enabled", True)
+        return apply_rig(entries + [e])
+
+    @app.put("/api/rig/fixture/{fid}")
+    def edit_fixture(fid: str, body: Patch):
+        need_store()
+        entries = rig_store.load_entries()
+        for i, e in enumerate(entries):
+            if e.get("id") == fid:
+                entries[i] = clean(body.model_dump(), e)
+                return apply_rig(entries)
+        raise HTTPException(404, "svetlo nenájdené")
+
+    @app.delete("/api/rig/fixture/{fid}")
+    def delete_fixture(fid: str):
+        need_store()
+        entries = rig_store.load_entries()
+        rest = [e for e in entries if e.get("id") != fid]
+        if len(rest) == len(entries):
+            raise HTTPException(404, "svetlo nenájdené")
+        return apply_rig(rest)
+
+    def fixture_for(fid: str) -> fxlib.Fixture:
+        for e in rig_store.load_entries():
+            if e.get("id") == fid:
+                try:
+                    return fxlib.build_fixture(e, fxlib.load_profiles())
+                except fxlib.RigError as ex:
+                    raise HTTPException(400, str(ex)) from ex
+        raise HTTPException(404, "svetlo nenájdené")
+
+    @app.post("/api/rig/identify/{fid}")
+    def identify(fid: str):
+        need_store()
+        import time as _t
+        box.engine.identify = (fixture_for(fid), _t.monotonic() + 4.0)
+        return {"ok": True}
+
+    @app.post("/api/rig/test/{fid}")
+    def test_channels(fid: str, body: Patch):
+        """Test kanálov: svieti len toto svetlo s hodnotami z appky (4 s od poslednej zmeny)."""
+        need_store()
+        import time as _t
+        fx = fixture_for(fid)
+        vals = {k: max(0, min(255, int(v))) for k, v in body.model_dump().items() if k in fx.channels}
+        box.engine.test = (fx, vals, _t.monotonic() + 4.0)
+        return {"ok": True}
+
+    @app.post("/api/rig/test-stop")
+    def test_stop():
+        box.engine.test = None
+        box.engine.identify = None
+        return {"ok": True}
+
+    @app.post("/api/rig/profile")
+    def add_profile(body: Patch):
+        need_store()
+        try:
+            prof = fxlib.save_user_profile(body.model_dump())
+        except fxlib.RigError as e:
+            raise HTTPException(400, str(e)) from e
+        return rig_state({"created": prof["id"]})
+
+    @app.get("/api/rig/export")
+    def export_rig():
+        need_store()
+        user = {p["id"]: {k: v for k, v in p.items() if k != "user"}
+                for p in fxlib.load_profiles().values() if p.get("user")}
+        return {"fixtures": rig_store.load_entries(), "profiles": user}
+
+    @app.post("/api/rig/import")
+    def import_rig(body: Patch):
+        need_store()
+        data = body.model_dump()
+        for prof in (data.get("profiles") or {}).values():
+            try:
+                modes = prof.get("modes") or {}
+                mode, m = next(iter(modes.items()))
+                fxlib.save_user_profile({**prof, "mode": mode, "channels": m.get("channels", [])})
+            except (fxlib.RigError, StopIteration, AttributeError) as e:
+                raise HTTPException(400, f"model {prof.get('name')}: {e}") from e
+        entries = data.get("fixtures")
+        if not isinstance(entries, list):
+            raise HTTPException(400, "súbor neobsahuje zoznam svetiel")
+        return apply_rig(entries)
 
     @app.get("/")
     def start():

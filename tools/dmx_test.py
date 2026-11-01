@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test DMX kanálov podľa fixtures.yaml (míľniky M1–M3).
+"""Test DMX kanálov podľa zoznamu svetiel rig.yaml (míľniky M1–M3).
 
   python3 tools/dmx_test.py raw 1 255 4 255 5 255     # kanál/hodnota páry, drží 10 s
   python3 tools/dmx_test.py walk belka                # prejde kanály svetla po jednom

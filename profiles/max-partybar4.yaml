@@ -1,0 +1,19 @@
+# Model svetla pre DMX-BOX. Kanály v poradí od 1; name = logické meno, fn = funkcia pre engine.
+id: max-partybar4
+name: MAX PartyBar4 (LED Parbar 4-way 3x 4-in-1 RGBW)
+manufacturer: MAX
+type: bar
+notes: Celá lišta má jednu farbu – jednotlivé pary sa cez DMX ovládať nedajú.
+modes:
+  8ch:
+    channels:
+      - {name: macro, fn: macro}          # 0–10 DMX RGBW | 11–50 static | 51–100 jump | 101–150 fade | 151–200 sound | 201–255 strobe
+      - {name: color_macro, fn: macro}
+      - {name: speed, fn: speed}
+      - {name: dimmer, fn: dimmer}
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}
+      - {name: white, fn: white}
+    ranges:
+      macro: {dmx: [0, 10], static: [11, 50], jump: [51, 100], fade: [101, 150], sound: [151, 200], strobe: [201, 255]}

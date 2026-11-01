@@ -42,11 +42,27 @@ Ak niečo nevyjde (napr. chýba zvuková karta), box scenár aj tak spustí a uk
 | **Hotspot** | zapnúť / vypnúť, ukázať a zmeniť heslo, „Zapnúť sám bez Wi-Fi“ |
 | **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 12 s) |
 | **Zvuk** | kam ide zvuk (jack, UCA202, BT reproduktor, HDMI) – **Použiť**; hlasitosť; AirPlay zap/vyp; Spotify Connect zap/vyp |
-| **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá) |
+| **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá), **Spravovať svetlá** (nižšie) |
 | **Zabezpečenie (PIN)** | **Nastaviť PIN** (4–8 číslic); **Zapnúť / Vypnúť vyžadovanie PINu** (potvrdzuje sa PINom); **Zmeniť PIN** (súčasný + nový); **Zamknúť toto zariadenie** |
 | **Systém** | verzia, teplota a napájanie; **Aktualizovať** z GitHubu (treba internet); reštart appky; reštart boxu; **Vypnúť box** pred vytiahnutím zo zásuvky |
 
 Akcie, ktoré odpoja tablet alebo vypnú box, treba potvrdiť druhým ťuknutím.
+
+### Spravovať svetlá
+
+Stránka **Svetlá** (`/lights.html`) – tvoj zoznam svetiel a iných DMX zariadení.
+
+- **Mapa kanálov:** políčko = jeden DMX kanál, farba = svetlo, v prvom políčku je jeho značka. Sivé = voľné, **červené = kolízia**. Vypnuté svetlá sú bledé, ale kanály im ostávajú rezervované.
+- **Zoznam:** každé svetlo má **značku** (napr. `SVETLO1`, `BAR`, `PAR-L`; 1–12 znakov A–Z, 0–9, `-`, `_`, jedinečná), meno, model, mód, kanály a návod „Na svetle nastav adresu 021 a mód 12CH“.
+  - **Identifikovať** – svetlo 4 s bliká na bielo, ostatné zhasnú (ktoré je ktoré).
+  - **Test kanálov** – posuvník pre každý kanál, svieti len toto svetlo (ako Simple Desk v QLC+).
+  - **Upraviť**, **Vypnúť / Zapnúť** (ostane v zozname, box ho neovláda), **Zmazať** (potvrdenie druhým ťuknutím).
+- **+ Pridať svetlo:** model z knižnice → mód → značka (navrhne `SVETLOn`) → meno → **DMX adresa** (alebo **Nájsť voľnú adresu**) → pozícia → **Pridať**. Kontrola beží už pri písaní adresy: zelená = v poriadku, červená = s ktorým svetlom a na ktorých kanáloch sa prekrýva, s návrhom voľnej adresy.
+- **Zrkadliť:** dve rovnaké svetlá (rovnaký model a mód) môžu mať zámerne rovnakú adresu – svietia identicky. Iné prekrytie box neuloží.
+- **Nový model:** keď svetlo nie je v knižnici – podľa manuálu zadáš počet kanálov a pri každom funkciu (červená, jas, pan, strobo…). Box podľa funkcií vie, ako svetlo ovládať.
+- **Export / Import:** záloha celého zoznamu aj vlastných modelov do súboru. Pred každou zmenou si box sám uloží zálohu (posledných 10 v `rig.backup/`).
+
+Nové svetlá sa hneď zapoja do show: farebné (PAR, lišta) dostávajú farby a jas, moving heady pohyb, efekty derby/UV/strobo podľa prepínačov. Pôvodné 4 svetlá majú vlastné vyladené efekty ako doteraz.
 
 ### PIN ochrana
 
@@ -101,7 +117,7 @@ Dve kolesá ako v myDMX GO. **Ťuknutie na efekt ho zapne a vypne AUTO** (ďalej
 
 ### Koleso 2 – Pohyb (moving head)
 
-Motor hlavy nestíha plynulé rýchle pohyby, preto rýchle efekty **skáču medzi pozíciami** na dobu a plynulé pohyby sú pomalé (cez viac taktov). Tilt je obmedzený (v `fixtures.yaml`), aby hlava nesvietila do očí ani do stropu.
+Motor hlavy nestíha plynulé rýchle pohyby, preto rýchle efekty **skáču medzi pozíciami** na dobu a plynulé pohyby sú pomalé (cez viac taktov). Tilt je obmedzený (v `rig.yaml`, `limits: tilt`), aby hlava nesvietila do očí ani do stropu.
 
 | Efekt | Čo robí |
 | --- | --- |
@@ -166,7 +182,7 @@ Pozor: **½×, 2× a TAP tempo zamknú** – box ho prestane meniť, aj keď pr�
 | Tlačidlo | Ako funguje |
 | --- | --- |
 | **STROBO** | **drž** – kým držíš, bliká všetko: lišta (strobo makro), Belka strobo naplno, hlava strobo a plný jas. Pustíš = späť na efekt. Funguje aj pri tichu. |
-| **DYM** | **drž** – kým držíš, ide dym, najviac 10 s. Po každom výstreku je **30 s pauza** (ochrana ohrievača a miestnosti) – tlačidlo zošedne a ukazuje odpočet `⏳ 25 s`. Po pauze treba tlačidlo pustiť a stlačiť znova. Pod nápisom: `pripravený` / `ide` / odpočet. Ak dymostroj nie je v `fixtures.yaml`, tlačidlo sa skryje. |
+| **DYM** | **drž** – kým držíš, ide dym, najviac 10 s. Po každom výstreku je **30 s pauza** (ochrana ohrievača a miestnosti) – tlačidlo zošedne a ukazuje odpočet `⏳ 25 s`. Po pauze treba tlačidlo pustiť a stlačiť znova. Pod nápisom: `pripravený` / `ide` / odpočet. Ak dymostroj nie je v zozname svetiel alebo je vypnutý, tlačidlo sa skryje. |
 | **BLACKOUT** | **prepínač** – všetko zhasne a dym sa zastaví. Hlava sa postaví do stredu. Druhé ťuknutie vráti svetlá. Má prednosť pred všetkým (aj pred STROBO). |
 
 ---

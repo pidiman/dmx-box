@@ -20,7 +20,7 @@ from .audio_ctl import LineIn
 from .config import load_config, resolve
 from .dmx_out import DMXOut
 from .engine import Engine
-from .fixtures import load_rig
+from .fixtures import RigStore
 from .nowplaying import NowPlaying
 from .scenario import ScenarioStore
 from .sim import GENRES, mix_source, synth_source
@@ -38,12 +38,14 @@ class Box:
     scenarios: ScenarioStore | None = None
     auth: Auth | None = None
     nowplaying: NowPlaying | None = None
+    rig_store: RigStore | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
           input_device: str | None = None, genre: str | None = None) -> Box:
     ac, dc = cfg["audio"], cfg["dmx"]
-    rig = load_rig(cfg["fixtures_file"])
+    rig_store = RigStore(cfg.get("rig_file", "rig.yaml"))
+    rig = rig_store.build()
     simulated = bool(sim_bpm or genre)
 
     def live():
@@ -72,7 +74,7 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     engine = Engine(rig, analyzer, store, out, fps=dc["fps"])
     return Box(store, analyzer, engine, out, LineIn(), sources,
                ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
-               Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying())
+               Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying(), rig_store)
 
 
 def main() -> None:

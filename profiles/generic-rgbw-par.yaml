@@ -1,0 +1,22 @@
+id: generic-rgbw-par
+name: Všeobecný RGBW PAR
+manufacturer: —
+type: par
+notes: Bežné lacné LED PAR svetlá. Over poradie kanálov v manuáli svojho svetla.
+modes:
+  4ch:
+    channels:
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}
+      - {name: white, fn: white}
+  8ch:
+    channels:
+      - {name: dimmer, fn: dimmer}
+      - {name: red, fn: red}
+      - {name: green, fn: green}
+      - {name: blue, fn: blue}
+      - {name: white, fn: white}
+      - {name: strobe, fn: strobe}
+      - {name: program, fn: program}
+      - {name: speed, fn: speed}

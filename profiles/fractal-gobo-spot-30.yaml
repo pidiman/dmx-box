@@ -1,0 +1,26 @@
+id: fractal-gobo-spot-30
+name: Fractal Lights Mini LED Gobo Spot 30W
+manufacturer: Fractal Lights
+type: moving_head
+notes: V menu musí byť SLnd → SL 1, inak svetlo ignoruje DMX. Motor nestíha plynulé kruhy na beat.
+modes:
+  12ch:
+    channels:
+      - {name: pan, fn: pan}
+      - {name: pan_fine, fn: pan_fine}
+      - {name: tilt, fn: tilt}
+      - {name: tilt_fine, fn: tilt_fine}
+      - {name: color, fn: color_wheel}
+      - {name: gobo, fn: gobo}
+      - {name: strobe, fn: strobe}
+      - {name: dimmer, fn: dimmer}        # pri 0 nesvieti
+      - {name: pt_speed, fn: pt_speed}    # 0 = rýchlo, 255 = pomaly
+      - {name: program, fn: program}      # 0–59 DMX, 60–159 auto, 160–255 sound
+      - {name: reset, fn: reset}          # 250–255 reset
+      - {name: led_ring, fn: effect}      # 0 vyp, 1–255 efekty
+    values:
+      color: {white: 0, red: 10, yellow: 20, blue: 30, green: 40, orange: 50, pink: 60, cyan: 70, half_colors: [80, 139], rainbow: [140, 255]}
+      gobo: {open: 0, gobos: [8, 16, 24, 32, 40, 48, 56], shake: [72, 127], rotate: [128, 255]}
+    limits:
+      pan: [0, 255]
+      tilt: [0, 255]

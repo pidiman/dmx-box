@@ -9,3 +9,6 @@ presets.json
 .pytest_cache/
 scenario.json
 security.json
+rig.yaml
+rig.backup/
+profiles/user/
