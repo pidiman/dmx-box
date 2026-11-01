@@ -26,7 +26,7 @@ Hore je stav boxu: Wi-Fi (alebo hotspot), DMX dongle a kam ide zvuk. Vpravo **Ov
 | **AirPlay z iPhonu / iPadu** | vyber box v AirPlay (Ovládacie centrum → ikona AirPlay) → výstup → skúška → akcia | zapne AirPlay prijímač. Ide z akejkoľvek appky cez Wi-Fi, bez sekania Bluetooth; názov skladby a zariadenie sa zobrazia v lište |
 | **Spotify Connect** | vyber fajny-dmx-box v Spotify (kontrola internetu) → výstup → skúška → akcia | zapne Spotify Connect. S novšími účtami nefunguje – potom Bluetooth |
 | **Kábel z DJ pultu / PC** | zapoj kábel do UCA202 IN (kontrola karty) → výstup → skúška → akcia | zapne line-in |
-| **Bluetooth reproduktor** | pripoj / nájdi a spáruj reproduktor → zdroj hudby (Spotify alebo kábel) + oneskorenie svetiel → skúška → akcia | zvuk do BT reproduktora, light delay (predvolene 200 ms) |
+| **Bluetooth reproduktor** | pripoj / nájdi a spáruj reproduktor → zdroj hudby (AirPlay, Spotify alebo kábel) + oneskorenie svetiel → skúška → akcia | zvuk do BT reproduktora, light delay (predvolene 200 ms) |
 | **Svetlá bez hudby** | – | pokojné scény štýlu Chill bez analýzy hudby, bez strobo, lasera a dymu |
 | **Demo** | akcia | simulovaný DJ set (bez zvuku), svetlá hrajú, akoby išla hudba |
 

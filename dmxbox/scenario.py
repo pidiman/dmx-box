@@ -31,7 +31,7 @@ SCENARIOS = [
      "desc": "Hudba ide káblom do vstupu zvukovej karty UCA202. Najmenšie oneskorenie.",
      "tags": ["Line-in", "Bez oneskorenia"]},
     {"id": "btspeaker", "name": "Bluetooth reproduktor",
-     "desc": "Hudba cez Spotify alebo kábel, zvuk ide do BT reproduktora. Svetlá sa oneskoria, aby sedeli.",
+     "desc": "Hudba cez AirPlay, Spotify alebo kábel, zvuk ide do BT reproduktora. Svetlá sa oneskoria, aby sedeli.",
      "tags": ["Light delay"]},
     {"id": "ambient", "name": "Svetlá bez hudby",
      "desc": "Pokojné farebné scény na večeru alebo ako dekorácia. Bez stroboskopu, lasera a dymu.",
@@ -104,7 +104,7 @@ def apply(box, data: dict) -> dict:
         step("Spotify", system.spotify_set, True)
     if sid == "bt":
         step("Bluetooth", system.bt_discoverable, True)
-    if sid == "airplay":
+    if sid == "airplay" or (sid == "btspeaker" and source == "airplay"):
         step("AirPlay", system.airplay_set, True)
     if data.get("volume") is not None:
         step("Hlasitosť", system.audio_volume, int(data["volume"]))

@@ -96,7 +96,7 @@ function openSetup(id) {
   choice = { id, style: id === "ambient" ? "chill" : (last?.id === id && last.style) || "auto",
              laser: settings.laser ?? true, fog_auto: settings.fog_auto ?? false };
   if (["bt", "airplay", "spotify", "linein"].includes(id)) choice.output = (last?.id === id && last.output) || defaultOutput();
-  if (id === "btspeaker") { choice.source = last?.source || "spotify"; choice.delay_ms = last?.delay_ms ?? 200; }
+  if (id === "btspeaker") { choice.source = last?.source || "airplay"; choice.delay_ms = last?.delay_ms ?? 200; }
   $("#s-title").textContent = s.name;
   $("#s-desc").textContent = s.desc;
   $("#home").hidden = true; $("#setup").hidden = false;
@@ -186,6 +186,7 @@ function stepSource(n) {
   const opt = (id, title, hint) => h("button", { class: "opt" + (choice.source === id ? " on" : ""), onclick: () => { choice.source = id; renderSteps(true); } },
     h("span", { class: "r" }), h("span", {}, h("b", {}, title), h("small", {}, hint)));
   return step(n, "Odkiaľ pôjde hudba", h("div", { class: "opts" },
+    opt("airplay", "AirPlay z iPhonu / iPadu", `Ovládacie centrum → AirPlay → ${NAME()}`),
     opt("spotify", "Spotify Connect", `V Spotify vyber zariadenie ${NAME()}`),
     opt("linein", "Kábel do UCA202", "DJ pult, PC, prehrávač")),
     step2Delay());
