@@ -13,6 +13,7 @@
 #   --wifi SSID HESLO        pridať Wi-Fi sieť (dá sa zopakovať pre viac sietí)
 #   --country KÓD            krajina Wi-Fi, potrebná pre 5 GHz (predvolene SK)
 #   --hostname / --bt-name   iné meno len pre sieť / len pre Bluetooth
+#   --no-jack                vypnúť 3,5 mm jack na Pi (pri UCA202 menej šumu); predvolene ostáva zapnutý
 # Neskoršie zmeny bez reinštalácie: príkaz `dmxbox help` (docs/PREVADZKA.md).
 set -euo pipefail
 
@@ -22,6 +23,7 @@ NAME="fajny-dmx-box"
 HOSTNAME_NEW=""
 COUNTRY="SK"
 BT_NAME=""
+NO_JACK=0
 WIFI=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,7 +34,8 @@ while [[ $# -gt 0 ]]; do
     --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
     --country) COUNTRY="$2"; shift 2 ;;
     --bt-name) BT_NAME="$2"; shift 2 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    --no-jack) NO_JACK=1; shift ;;
+    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
     *) echo "neznámy parameter: $1 (./install.sh --help)"; exit 1 ;;
   esac
 done
@@ -59,13 +62,22 @@ echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="16c0", ATTR{idProduct}=="05dc", MODE="0
   | sudo tee /etc/udev/rules.d/50-udmx.rules >/dev/null
 sudo udevadm control --reload && sudo udevadm trigger
 
-say "Vypnúť onboard analógový zvuk (PWM)"
 CFG=/boot/firmware/config.txt
 [[ -f $CFG ]] || CFG=/boot/config.txt
-if grep -q '^dtparam=audio=on' "$CFG"; then
-  sudo sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CFG"
-elif ! grep -q '^dtparam=audio=off' "$CFG"; then
-  echo 'dtparam=audio=off' | sudo tee -a "$CFG" >/dev/null
+if [[ $NO_JACK -eq 1 ]]; then
+  say "Vypnúť 3,5 mm jack na Pi (zvuk len cez UCA202)"
+  if grep -q '^dtparam=audio=on' "$CFG"; then
+    sudo sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CFG"
+  elif ! grep -q '^dtparam=audio=off' "$CFG"; then
+    echo 'dtparam=audio=off' | sudo tee -a "$CFG" >/dev/null
+  fi
+else
+  say "3,5 mm jack na Pi zapnutý (reproduktor sa dá zapojiť aj bez UCA202)"
+  if grep -q '^dtparam=audio=off' "$CFG"; then
+    sudo sed -i 's/^dtparam=audio=off/dtparam=audio=on/' "$CFG"
+  elif ! grep -q '^dtparam=audio=on' "$CFG"; then
+    echo 'dtparam=audio=on' | sudo tee -a "$CFG" >/dev/null
+  fi
 fi
 
 say "Bluetooth: $BT_NAME ako reproduktor"

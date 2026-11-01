@@ -192,7 +192,7 @@ function stepOutput(n) {
     sinks.length ? h("div", { class: "opts" }, sinks.map((s) =>
       h("button", { class: "opt" + (choice.output === s.name ? " on" : ""), onclick: () => { choice.output = s.name; renderSteps(true); } },
         h("span", { class: "r" }), h("span", {}, h("b", {}, s.label), h("small", {}, s.kind === "usb" ? "AUX reproduktora do výstupu UCA202" : s.kind === "jack" ? "Kábel do 3,5 mm jacku na Pi" : s.description)))))
-      : row(false, "Žiadny zvukový výstup – zapoj UCA202 alebo reproduktor do jacku"),
+      : row(false, "Žiadny zvukový výstup. Zapoj UCA202 do USB, alebo zapni jack na Pi (návod: Riešenie problémov v docs/PREVADZKA.md) a reštartuj box."),
     vol != null ? h("label", { style: "display:grid;gap:6px;font-size:14px;color:#a3a3b8" }, "Hlasitosť boxu",
       h("input", { type: "range", min: 0, max: 100, value: choice.volume ?? vol, onchange: (e) => { choice.volume = +e.target.value; } })) : null);
 }

@@ -20,6 +20,7 @@ sudo reboot
 | `--country KÓD` | krajina Wi-Fi, bez nej nejde 5 GHz hotspot | `SK` |
 | `--name MENO` | meno boxu: v sieti (`http://MENO.local`), Wi-Fi hotspot, Bluetooth aj Spotify | `fajny-dmx-box` |
 | `--bt-name MENO` | iné meno len pre Bluetooth | ako `--name` |
+| `--no-jack` | vypnúť 3,5 mm jack na Pi (pri UCA202 menej šumu) | jack zapnutý |
 
 `install.sh` sa dá spustiť znova kedykoľvek, napríklad keď chceš doplniť parameter. Nič nerozbije, len nastavenia prepíše.
 
@@ -212,4 +213,5 @@ lsusb                          # 16c0:05dc = DMX dongle, 08bb:29xx = UCA202
 | Svetlá svietia pred zvukom | BT reproduktor má oneskorenie, nastav `dmxbox audio delay 150–250` |
 | Hotspot sa nezapne | `dmxbox logs wifi`; krajina Wi-Fi (`sudo raspi-config nonint get_wifi_country` musí vrátiť SK) |
 | Mobil sa nevie spárovať | `dmxbox bt forget-all`, v mobile zabudni fajny-dmx-box a spáruj znova |
+| V appke je len „Dummy Output“, skúška zvuku nič neukáže | box nevidí žiadny zvukový výstup: zapoj UCA202, alebo zapni jack: `sudo sed -i 's/^dtparam=audio=off/dtparam=audio=on/' /boot/firmware/config.txt && sudo reboot` |
 | `throttled` ≠ 0x0 | slabý zdroj alebo kábel; Pi 3B+ potrebuje 5 V / 2,5 A |

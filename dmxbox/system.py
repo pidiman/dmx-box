@@ -291,7 +291,10 @@ def audio_status() -> dict:
             elif s.startswith("Description:") and name:
                 desc = s.split(":", 1)[1].strip()
                 kind = _sink_kind(name)
-                if "null" in name.lower() or name in ("auto_null",):
+                if name == "auto_null":      # „Dummy Output“: PipeWire nenašiel žiadny skutočný výstup
+                    name = None
+                    continue
+                if "null" in name.lower():
                     kind = "other"
                 st["sinks"].append({"name": name, "description": desc, "kind": kind,
                                     "label": KIND_NAMES[kind] if kind != "other" else desc,
