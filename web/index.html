@@ -18,11 +18,11 @@
       <span id="beat" class="dot"></span>
       <strong id="bpm">---</strong><small>BPM</small>
     </div>
-    <div class="status"><a class="pill" href="/" title="Scenáre a nastavenia boxu">⌂ Scenáre</a><a class="pill" href="viz.html" target="_blank" title="Virtuálne svetlá">👁 Viz</a><span id="conn" class="pill off">offline</span><span id="dmx" class="pill">DMX</span></div>
+    <div class="track" id="track" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="tt"><strong id="track-title"></strong><span id="track-artist"></span></span></div>
+    <div class="status"><a class="pill" href="/" title="Scenáre a nastavenia boxu" aria-label="Scenáre">⌂<span class="lbl"> Scenáre</span></a><a class="pill" href="viz.html" target="_blank" title="Virtuálne svetlá" aria-label="Virtuálne svetlá">👁<span class="lbl"> Viz</span></a><span id="conn" class="pill off">offline</span><span id="dmx" class="pill">DMX</span></div>
   </header>
 
   <section class="spectrum" aria-label="Vizualizácia hudby">
-    <div class="track" id="track" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><strong id="track-title"></strong><span id="track-artist"></span></div>
     <div class="spec-row">
       <div class="spec-ch" aria-hidden="true"><span>L</span><span>R</span></div>
       <canvas id="spec" height="104" role="img" aria-label="Spektrum ľavého a pravého kanála: basy vľavo, výšky vpravo"></canvas>

@@ -73,7 +73,7 @@ Svetlá v texte: **lišta** = MAX PartyBar4, **hlava** = moving head Fractal Gob
 | **● bodka** | bliká na každú dobu (beat). Ak bliká mimo hudby, oprav tempo (½× / 2× / TAP). |
 | **BPM** | odhadnuté tempo. `---` = ticho. |
 | **Spektrum pod lištou** | vizualizácia hudby: 24 pásiem od basov (vľavo, tyrkysová) po výšky (vpravo, ružová). **Ľavý kanál rastie nahor, pravý nadol** od stredovej čiary. Výška sa prispôsobuje hlasitosti, takže vidno rytmus aj pri tichej hudbe. Pri tichu stojí. |
-| **♪ Názov skladby** | názov, interpret a zariadenie, odkiaľ hrá (napr. iPad). Mobil ho posiela cez Bluetooth (AVRCP) – Spotify, Apple Music, YouTube… Pri kábli (line-in) sa nezobrazuje, kábel nesie len zvuk. |
+| **♪ Názov skladby** (v lište vedľa BPM) | názov, interpret a zariadenie, odkiaľ hrá (napr. iPad). Mobil ho posiela cez Bluetooth (AVRCP) – Spotify, Apple Music, YouTube… Pri kábli (line-in) sa nezobrazuje, kábel nesie len zvuk. |
 | **⌂ Scenáre** | späť na vstupnú obrazovku (zmena scenára, nastavenia boxu). |
 | **👁 Viz** | otvorí virtuálne svetlá (`viz.html`) – kreslí presne to, čo ide do svetiel. Na testy bez svetiel. |
 | **online / offline** | spojenie tabletu s boxom. Pri offline sa appka pripája znova sama. |

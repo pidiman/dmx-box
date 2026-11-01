@@ -123,11 +123,16 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 
 /* vizualizácia hudby pod hornou lištou */
 .spectrum { max-width: 980px; margin: 0 auto; padding: 10px 16px 6px; display: grid; gap: 4px; border-bottom: 1px solid var(--line); }
-.spectrum .track { display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; color: var(--muted); }
-.spectrum .track svg { flex: none; color: var(--accent2); }
-.spectrum .track strong { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.spectrum .track span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-.spectrum .track[hidden] { display: none; }
+.top .bpm { min-width: auto; flex: none; }
+.top .track { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.top .track[hidden] { display: none; }
+.top .track svg { flex: none; color: var(--accent2); }
+.top .track .tt { display: grid; min-width: 0; line-height: 1.2; }
+.top .track strong, .top .track .tt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .track strong { font-size: 15px; font-weight: 600; }
+.top .track .tt span { font-size: 12px; color: var(--muted); }
+.top .status { flex: none; }
+@media (max-width: 520px) { .top { gap: 10px; } .top #conn, .top .lbl { display: none; } }
 .spec-row { display: flex; gap: 8px; align-items: stretch; }
 .spec-ch { width: 14px; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 0;
   font-size: 11px; font-weight: 700; color: var(--muted); }
