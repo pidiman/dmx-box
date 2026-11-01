@@ -45,7 +45,7 @@ git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
 sudo reboot
 ```
 
-Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku).
+Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku). Čo robí každé tlačidlo, efekt a štýl: **[docs/OVLADANIE.md](docs/OVLADANIE.md)**.
 
 Správa na Pi príkazom **`dmxbox`**: `dmxbox status`, `dmxbox wifi add …`, `dmxbox hotspot …`, `dmxbox bt …`, `dmxbox spotify on|off`, `dmxbox audio …`, `dmxbox update`. Všetky parametre inštalácie, spôsoby spustenia a postupy pri zmene Wi-Fi, mobilu či reproduktora sú v **[docs/PREVADZKA.md](docs/PREVADZKA.md)**.
 

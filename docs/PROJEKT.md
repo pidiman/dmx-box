@@ -408,7 +408,7 @@ Paleta sa riadi štýlom, kým v UI nezvolíš inú (chip „podľa štýlu“ t
 
 ## Web UI (PWA) a API
 
-Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu ako appku. UI je jedna obrazovka s veľkými tlačidlami pre ovládanie palcom.
+Tablet alebo mobil otvorí `http://dmx-box.local` a pridá si stránku na plochu ako appku. UI je jedna obrazovka s veľkými tlačidlami pre ovládanie palcom. Podrobný popis každého prvku: [OVLADANIE.md](OVLADANIE.md).
 
 **Obrazovka**
 
