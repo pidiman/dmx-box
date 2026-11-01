@@ -27,6 +27,7 @@ async function api(method, path, body) {
     method, headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  if (r.status === 401 && !path.startsWith("/api/auth")) { location.href = "/lock.html?next=" + encodeURIComponent(location.pathname + location.hash); throw new Error("zadaj PIN"); }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
   return r.json();
 }

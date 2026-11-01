@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import uvicorn
 
 from .api import create_app
+from .auth import Auth
 from .audio import Analyzer, device_source, list_inputs, parec_source
 from .audio_ctl import LineIn
 from .config import load_config, resolve
@@ -34,6 +35,7 @@ class Box:
     line_in: LineIn
     sources: dict[str, Callable] = field(default_factory=dict)   # "live" / "demo" → nový generátor
     scenarios: ScenarioStore | None = None
+    auth: Auth | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
@@ -67,7 +69,8 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
                   Settings(light_delay_ms=cfg["output"]["light_delay_ms"]))
     engine = Engine(rig, analyzer, store, out, fps=dc["fps"])
     return Box(store, analyzer, engine, out, LineIn(), sources,
-               ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))))
+               ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
+               Auth(resolve(cfg.get("security_file", "security.json"))))
 
 
 def main() -> None:

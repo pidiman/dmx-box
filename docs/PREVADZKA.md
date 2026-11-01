@@ -193,6 +193,8 @@ Treba Spotify Premium a internet. V režime hotspot internet nie je, preto tam o
 | `config.yaml` | audio, DMX ovládač a počet kanálov, port webu, light delay | `dmxbox restart` |
 | `fixtures.yaml` | svetlá, DMX adresy, kanály | `dmxbox restart` |
 | `presets.json` | 50 presetov z UI | nemeniť ručne |
+| `security.json` | PIN appky (hash) a či sa vyžaduje | `dmxbox pin status / off / reset` |
+| `scenario.json` | posledný scenár („Ako minule“) | nemeniť ručne |
 | `/etc/bluetooth/main.conf` | BT meno a viditeľnosť | `dmxbox bt name` |
 | NetworkManager (`dmx-hotspot` a Wi-Fi siete) | Wi-Fi a hotspot | `dmxbox wifi …`, `dmxbox hotspot …` |
 

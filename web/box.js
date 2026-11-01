@@ -2,6 +2,7 @@
 // Nastavenia boxu bez SSH: Wi-Fi, hotspot, Bluetooth, zvuk, Spotify, aktualizácia, vypnutie.
 
 const $ = (s) => document.querySelector(s);
+let authSt = null;
 let sys = null, wifiScan = null, btFound = null, busy = {}, showPass = false;
 const NAME = () => sys?.system?.hostname || "fajny-dmx-box";
 const SSID = () => sys?.wifi?.hotspot?.ssid || NAME();
@@ -19,6 +20,7 @@ function h(tag, attrs = {}, ...kids) {
 }
 async function api(method, path, body) {
   const r = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401 && !path.startsWith("/api/auth")) { location.href = "/lock.html?next=" + encodeURIComponent(location.pathname + location.hash); throw new Error("zadaj PIN"); }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.detail || r.statusText);
   return d;
@@ -182,13 +184,55 @@ function renderSys() {
     confirmBtn("Vypnúť", "Naozaj vypnúť?", () => act("po", () => api("POST", "/api/system/power", { value: "poweroff" }), "Box sa vypína – po 20 s ho môžeš odpojiť"), "danger")));
 }
 
+// --- PIN ochrana ------------------------------------------------------------------------
+function pinInput(ph) {
+  return h("input", { type: "password", inputmode: "numeric", pattern: "[0-9]*", maxlength: 8, placeholder: ph, autocomplete: "off" });
+}
+function renderSec() {
+  const g = $("#g-sec"); g.innerHTML = "";
+  if (!authSt) return;
+  if (!authSt.has_pin) {
+    g.append(item(lbl("PIN nie je nastavený", "appku môže ovládať ktokoľvek v rovnakej Wi-Fi")));
+    const p1 = pinInput("Nový PIN (4–8 číslic)"), p2 = pinInput("Zopakuj PIN");
+    g.append(h("div", { class: "form" }, p1, p2, h("button", { onclick: () => {
+      if (!/^\d{4,8}$/.test(p1.value)) return toast("PIN musí mať 4–8 číslic");
+      if (p1.value !== p2.value) return toast("PINy sa nezhodujú");
+      act("ps", () => api("POST", "/api/auth/pin", { pin: "", new_pin: p1.value }), "PIN nastavený. Teraz môžeš zapnúť jeho vyžadovanie.");
+    } }, "Nastaviť PIN")));
+    return;
+  }
+  // zapnúť / vypnúť vyžadovanie
+  const pc = pinInput("Potvrď PINom");
+  g.append(item(lbl("Vyžadovať PIN", authSt.required ? "zapnuté – nové zariadenie musí zadať PIN (platí 30 dní)" : "vypnuté – appka je otvorená bez PINu", authSt.required ? "ok" : "")));
+  g.append(h("div", { class: "form" }, pc, h("button", { onclick: () => {
+    if (!pc.value) return toast("Zadaj PIN");
+    const on = !authSt.required;
+    act("pr", () => api("POST", "/api/auth/required", { pin: pc.value, on }), on ? "PIN sa bude vyžadovať" : "PIN sa už nevyžaduje");
+  } }, authSt.required ? "Vypnúť vyžadovanie PINu" : "Zapnúť vyžadovanie PINu")));
+  // zmena PINu
+  const cur = pinInput("Súčasný PIN"), n1 = pinInput("Nový PIN"), n2 = pinInput("Zopakuj nový PIN");
+  g.append(h("div", { class: "form" }, h("b", {}, "Zmeniť PIN"), cur, n1, n2, h("button", { onclick: () => {
+    if (!/^\d{4,8}$/.test(n1.value)) return toast("PIN musí mať 4–8 číslic");
+    if (n1.value !== n2.value) return toast("Nové PINy sa nezhodujú");
+    act("pc", () => api("POST", "/api/auth/pin", { pin: cur.value, new_pin: n1.value }), "PIN zmenený. Ostatné zariadenia musia zadať nový PIN.");
+  } }, "Zmeniť PIN")));
+  if (authSt.required) {
+    g.append(h("div", { class: "item" }, h("button", { class: "linkbtn", onclick: async () => {
+      await api("POST", "/api/auth/logout").catch(() => {});
+      location.href = "/lock.html?next=/box.html";
+    } }, "Zamknúť toto zariadenie")));
+  }
+  g.append(h("div", { class: "item" }, h("span", { class: "hint" }, "Zabudnutý PIN: na Pi príkaz dmxbox pin reset.")));
+}
+
 function render() {
   if (!sys) return;
+  renderSec();
   document.title = `${NAME()} – nastavenia`;
   renderWifi(); renderHotspot(); renderBt(); renderAudio(); renderDmx(); renderSys();
 }
 async function refresh() {
-  try { sys = await api("GET", "/api/system"); render(); }
+  try { [sys, authSt] = await Promise.all([api("GET", "/api/system"), api("GET", "/api/auth")]); render(); }
   catch { toast("Box neodpovedá – skontroluj Wi-Fi", 4000); }
 }
 refresh();

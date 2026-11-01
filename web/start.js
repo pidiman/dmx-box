@@ -30,6 +30,7 @@ function h(tag, attrs = {}, ...kids) {
 
 async function api(method, path, body) {
   const r = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401 && !path.startsWith("/api/auth")) { location.href = "/lock.html?next=" + encodeURIComponent(location.pathname + location.hash); throw new Error("zadaj PIN"); }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.detail || r.statusText);
   return d;

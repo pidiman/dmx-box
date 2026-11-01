@@ -360,3 +360,51 @@ def test_system_helpers():
         raise AssertionError
     except system.CmdError:
         pass
+
+
+def test_pin_protection(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from dmxbox.api import create_app
+    from dmxbox.auth import Auth
+
+    box = _box(tmp_path)
+    box.auth = Auth(tmp_path / "security.json")
+    c = TestClient(create_app(box))
+    assert c.get("/api/auth").json() == {"required": False, "has_pin": False, "ok": False}
+    assert c.get("/api/state").status_code == 200                  # bez PINu otvorené
+    assert c.post("/api/auth/required", json={"pin": "1", "on": True}).status_code == 401
+    assert c.post("/api/auth/pin", json={"pin": "", "new_pin": "12"}).status_code == 400
+    assert c.post("/api/auth/pin", json={"pin": "", "new_pin": "2468"}).status_code == 200
+    assert c.post("/api/auth/required", json={"pin": "2468", "on": True}).json()["required"]
+
+    other = TestClient(create_app(box))                           # iný tablet bez cookie
+    r = other.get("/", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"].startswith("/lock.html")
+    assert other.get("/api/state").status_code == 401
+    assert other.get("/lock.html").status_code == 200
+    assert other.post("/api/auth/pin", json={"pin": "0000", "new_pin": "1111"}).status_code == 401
+    assert other.post("/api/auth/login", json={"pin": "9999"}).status_code == 401
+    assert other.post("/api/auth/login", json={"pin": "2468"}).status_code == 200
+    assert other.get("/api/state").status_code == 200
+    with other.websocket_connect("/ws") as ws:
+        assert "audio" in ws.receive_json()
+
+    # PIN sa ukladá len ako hash a prežije reštart
+    saved = (tmp_path / "security.json").read_text()
+    assert "2468" not in saved and Auth(tmp_path / "security.json").required
+
+    # zmena PINu odhlási ostatné zariadenia
+    assert c.post("/api/auth/pin", json={"pin": "2468", "new_pin": "13579"}).status_code == 200
+    assert other.get("/api/state").status_code == 401
+    assert c.get("/api/state").status_code == 200
+
+    # veľa zlých pokusov → pauza
+    third = TestClient(create_app(box))
+    for _ in range(5):
+        third.post("/api/auth/login", json={"pin": "0000"})
+    assert third.post("/api/auth/login", json={"pin": "13579"}).status_code == 429
+    box.auth._fails.clear()        # testovacie klienty majú rovnakú adresu
+
+    assert c.post("/api/auth/required", json={"pin": "13579", "on": False}).json()["required"] is False
+    assert TestClient(create_app(box)).get("/api/state").status_code == 200

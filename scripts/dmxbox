@@ -213,6 +213,7 @@ dmxbox – správa DMX-BOX
 
   spotify on | off | status       Spotify Connect (Premium + internet)
 
+  pin status | off | reset         PIN appky: stav / vypnúť vyžadovanie / zmazať PIN (zabudnutý PIN)
   name NOVE-MENO                  premenovať box: sieť (MENO.local), hotspot, Bluetooth, Spotify
 
   audio list                      výstupy/vstupy (ID pre wpctl)
@@ -242,6 +243,14 @@ case "${1:-help}" in
   bt|bluetooth) shift; cmd_bt "$@" ;;
   spotify) shift; cmd_spotify "$@" ;;
   audio) shift; cmd_audio "$@" ;;
+  pin) SEC="$REPO/security.json"
+       case "${2:-status}" in
+         status) python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print('PIN nastavený:', bool(d.get('pin_hash')), '| vyžaduje sa:', bool(d.get('required')))" "$SEC" 2>/dev/null || echo "PIN nie je nastavený" ;;
+         off)    python3 -c "import json,sys;p=sys.argv[1];d=json.load(open(p));d['required']=False;json.dump(d,open(p,'w'),indent=2)" "$SEC" 2>/dev/null \
+                   && systemctl --user try-restart dmxbox && echo "PIN sa už nevyžaduje (PIN ostal uložený)." || echo "PIN nie je nastavený" ;;
+         reset)  rm -f "$SEC" && systemctl --user try-restart dmxbox && echo "PIN zmazaný, appka je otvorená. Nový nastavíš v Nastaveniach boxu." ;;
+         *) die "pin status|off|reset" ;;
+       esac ;;
   name) need "${2:-}"
         [[ "$2" =~ ^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$ ]] || die "meno: malé písmená, číslice, pomlčky"
         sudo hostnamectl set-hostname "$2"

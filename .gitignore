@@ -8,3 +8,4 @@ presets.json
 .DS_Store
 .pytest_cache/
 scenario.json
+security.json

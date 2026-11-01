@@ -42,9 +42,19 @@ Ak niečo nevyjde (napr. chýba zvuková karta), box scenár aj tak spustí a uk
 | **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 12 s) |
 | **Zvuk** | kam ide zvuk (jack, UCA202, BT reproduktor, HDMI) – **Použiť**; hlasitosť; Spotify Connect zap/vyp |
 | **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá) |
+| **Zabezpečenie (PIN)** | **Nastaviť PIN** (4–8 číslic); **Zapnúť / Vypnúť vyžadovanie PINu** (potvrdzuje sa PINom); **Zmeniť PIN** (súčasný + nový); **Zamknúť toto zariadenie** |
 | **Systém** | verzia, teplota a napájanie; **Aktualizovať** z GitHubu (treba internet); reštart appky; reštart boxu; **Vypnúť box** pred vytiahnutím zo zásuvky |
 
-Akcie, ktoré odpoja tablet alebo vypnú box, treba potvrdiť druhým ťuknutím. Pri prepnutí Wi-Fi alebo hotspotu sa tablet odpojí – pripoj ho na novú sieť a otvor appku znova.
+Akcie, ktoré odpoja tablet alebo vypnú box, treba potvrdiť druhým ťuknutím.
+
+### PIN ochrana
+
+Keď je vyžadovanie PINu zapnuté, každé nové zariadenie (tablet, mobil hosťa) uvidí najprv obrazovku **Zadaj PIN** s číselníkom. Po správnom PINe si zariadenie prihlásenie pamätá **30 dní**, takže vlastný tablet sa nepýta stále. Chráni celú appku: scenáre, ovládanie svetiel, nastavenia aj virtuálne svetlá.
+
+- Po 5 zlých pokusoch je 30 s pauza.
+- Zmena PINu odhlási všetky ostatné zariadenia.
+- PIN sa v boxe ukladá len ako hash (`security.json`), nie čitateľne.
+- **Zabudnutý PIN:** na Pi cez SSH `dmxbox pin reset` (zmaže PIN, appka je znova otvorená) alebo `dmxbox pin off` (PIN ostane, len sa nevyžaduje). Pri prepnutí Wi-Fi alebo hotspotu sa tablet odpojí – pripoj ho na novú sieť a otvor appku znova.
 
 ---
 

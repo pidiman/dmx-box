@@ -25,6 +25,7 @@ DEFAULTS: dict = {
     "presets_file": "presets.json",
     "fixtures_file": "fixtures.yaml",
     "scenario_file": "scenario.json",
+    "security_file": "security.json",
 }
 
 

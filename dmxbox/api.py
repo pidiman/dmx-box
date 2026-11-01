@@ -10,11 +10,12 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import scenario as scen
+from .auth import COOKIE, MAX_AGE, Auth, PinError
 from . import system
 from .config import ROOT
 from .effects.color import COLOR_FX, PALETTES
@@ -68,6 +69,15 @@ def _cmd(fn, *args):
     return {"ok": True, "result": res}
 
 
+class PinBody(BaseModel):
+    pin: str
+    new_pin: str | None = None
+    on: bool | None = None
+
+
+PUBLIC = {"/lock.html", "/lock.js", "/style.css", "/start.css", "/icon.svg", "/manifest.json", "/sw.js"}
+
+
 class Captive:
     """V hotspote presmeruje cudzie domény (kontrola pripojenia mobilu) na vstupnú obrazovku.
 
@@ -104,13 +114,70 @@ def create_app(box) -> FastAPI:
     app = FastAPI(title="DMX-BOX", version="0.3.0")
     web = ROOT / "web"
     captive = Captive()
+    auth: Auth = getattr(box, "auth", None) or Auth(None)
 
     @app.middleware("http")
-    async def captive_portal(request: Request, call_next):
+    async def guard(request: Request, call_next):
         host = request.headers.get("host", "")
         if host and captive.foreign(host) and captive.hotspot():
             return RedirectResponse("http://10.42.0.1/", status_code=302)
+        path = request.url.path
+        if (auth.required and path not in PUBLIC and not path.startswith("/api/auth")
+                and not auth.valid(request.cookies.get(COOKIE))):
+            if path.startswith("/api"):
+                return JSONResponse({"detail": "zadaj PIN"}, status_code=401)
+            nxt = path if path.startswith("/") and not path.startswith("//") else "/"
+            return RedirectResponse(f"/lock.html?next={nxt}", status_code=302)
         return await call_next(request)
+
+    def logged_in(resp: JSONResponse) -> JSONResponse:
+        resp.set_cookie(COOKIE, auth.token(), max_age=MAX_AGE, httponly=True, samesite="lax")
+        return resp
+
+    # --- PIN ochrana -----------------------------------------------------------------
+    @app.get("/api/auth")
+    def auth_state(request: Request):
+        return {"required": auth.required, "has_pin": auth.has_pin,
+                "ok": auth.valid(request.cookies.get(COOKIE))}
+
+    @app.post("/api/auth/login")
+    def auth_login(body: PinBody, request: Request):
+        try:
+            ok = auth.check_pin(body.pin, request.client.host if request.client else "")
+        except PinError as e:
+            raise HTTPException(429, str(e)) from e
+        if not ok:
+            raise HTTPException(401, "nesprávny PIN")
+        return logged_in(JSONResponse({"ok": True}))
+
+    @app.post("/api/auth/pin")
+    def auth_set_pin(body: PinBody, request: Request):
+        """Nastaviť alebo zmeniť PIN. Existujúci PIN treba potvrdiť (pin), nový je new_pin."""
+        client = request.client.host if request.client else ""
+        try:
+            if auth.has_pin and not auth.check_pin(body.pin, client):
+                raise HTTPException(401, "nesprávny súčasný PIN")
+            auth.set_pin(body.new_pin or "")
+        except PinError as e:
+            raise HTTPException(400, str(e)) from e
+        return logged_in(JSONResponse({"ok": True, "required": auth.required}))
+
+    @app.post("/api/auth/required")
+    def auth_required(body: PinBody, request: Request):
+        """Zapnúť/vypnúť vyžadovanie PINu – vždy s potvrdením PINom."""
+        try:
+            if not auth.check_pin(body.pin, request.client.host if request.client else ""):
+                raise HTTPException(401, "nesprávny PIN")
+            auth.set_required(bool(body.on))
+        except PinError as e:
+            raise HTTPException(400, str(e)) from e
+        return logged_in(JSONResponse({"ok": True, "required": auth.required}))
+
+    @app.post("/api/auth/logout")
+    def auth_logout():
+        resp = JSONResponse({"ok": True})
+        resp.delete_cookie(COOKIE)
+        return resp
 
     def snapshot() -> dict[str, Any]:
         a = box.analyzer.snapshot()
@@ -229,6 +296,9 @@ def create_app(box) -> FastAPI:
 
     @app.websocket("/ws")
     async def ws(sock: WebSocket):
+        if not auth.allowed(sock.cookies.get(COOKIE)):
+            await sock.close(code=4401)
+            return
         await sock.accept()
         try:
             while True:
@@ -240,6 +310,9 @@ def create_app(box) -> FastAPI:
     @app.websocket("/ws/dmx")
     async def ws_dmx(sock: WebSocket):
         """DMX rámec tak, ako ide do svetiel (aj s light delay), ~30× za sekundu."""
+        if not auth.allowed(sock.cookies.get(COOKIE)):
+            await sock.close(code=4401)
+            return
         await sock.accept()
         try:
             while True:
