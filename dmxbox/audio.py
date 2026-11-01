@@ -81,14 +81,25 @@ def parec_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
                "--channels=2", "--latency-msec=20"]
         log.info("audio: %s", " ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        switched = False
+        next_check = time.monotonic() + 2.0
         try:
             while True:
                 raw = proc.stdout.read(bytes_per_block)
                 if not raw or len(raw) < bytes_per_block:
                     break
                 yield np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+                # výstup zvuku sa zmenil (napr. pripojený BT reproduktor) → počúvaj nový
+                if device == "auto" and time.monotonic() >= next_check:
+                    next_check = time.monotonic() + 2.0
+                    if default_monitor() != dev:
+                        switched = True
+                        break
         finally:
             proc.kill()
+        if switched:
+            log.info("audio: výstup zvuku sa zmenil, prepínam analýzu")
+            continue
         log.warning("parec skončil, reštart o 1 s")
         time.sleep(1)
 
