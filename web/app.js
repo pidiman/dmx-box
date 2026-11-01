@@ -138,9 +138,15 @@ function live(d) {
   const a = d.audio;
   $("#bpm").textContent = a.silent ? "---" : Math.round(a.bpm);
   $("#beat").style.opacity = a.silent ? 0.15 : Math.max(0.15, 1 - a.phase * 1.6);
-  $("#vu-bass").style.width = `${a.bass * 100}%`;
-  $("#vu-mid").style.width = `${a.mid * 100}%`;
-  $("#vu-high").style.width = `${a.high * 100}%`;
+  if (d.viz) { spec.l = d.viz.l; spec.r = d.viz.r; }
+  spec.silent = a.silent;
+  const tr = d.track, tb = $("#track");
+  const showTrack = !!(tr && tr.title);
+  tb.hidden = !showTrack;
+  if (showTrack) {
+    $("#track-title").textContent = tr.title;
+    $("#track-artist").textContent = [tr.artist, tr.source && `· ${tr.source}`].filter(Boolean).join(" ");
+  }
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = "pill " + (d.dmx.connected ? "on" : "off");
@@ -165,6 +171,37 @@ function live(d) {
   $("#fog-info").textContent = f.on ? "ide" : f.ready ? "pripravený" : `⏳ ${Math.ceil(f.cooldown)} s`;
   if (JSON.stringify(d.settings) !== JSON.stringify(settings)) apply(d.settings);
 }
+
+// --- vizualizácia hudby: zrkadlové spektrum L (hore) / R (dole) ------------------------
+const spec = { l: [], r: [], silent: true, sl: [], sr: [] };
+function drawSpec() {
+  const cv = $("#spec");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const n = Math.max(spec.l.length, 24), mid = h / 2, gap = 2, bw = (w - gap * (n - 1)) / n;
+  // plynulý prechod medzi správami z boxu (20×/s → 60 fps)
+  for (const [src, dst] of [[spec.l, spec.sl], [spec.r, spec.sr]]) {
+    for (let i = 0; i < n; i++) {
+      const target = spec.silent ? 0 : (src[i] || 0);
+      dst[i] = (dst[i] || 0) + (target - (dst[i] || 0)) * 0.35;
+    }
+  }
+  g.fillStyle = "#303046"; g.fillRect(0, mid - 0.5, w, 1);
+  for (let i = 0; i < n; i++) {
+    const x = i * (bw + gap), k = i / (n - 1);
+    g.fillStyle = `rgb(${Math.round(41 + 214 * k)},${Math.round(211 - 165 * k)},${Math.round(255 - 129 * k)})`;
+    const hl = Math.max(1.5, spec.sl[i] * (mid - 3)), hr = Math.max(1.5, spec.sr[i] * (mid - 3));
+    g.globalAlpha = 1; g.fillRect(x, mid - 1 - hl, bw, hl);
+    g.globalAlpha = 0.85; g.fillRect(x, mid + 1, bw, hr);
+  }
+  g.globalAlpha = 1;
+  requestAnimationFrame(drawSpec);
+}
+requestAnimationFrame(drawSpec);
 
 // --- WebSocket -------------------------------------------------------------
 function connect() {

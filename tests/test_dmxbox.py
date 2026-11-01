@@ -408,3 +408,24 @@ def test_pin_protection(tmp_path):
 
     assert c.post("/api/auth/required", json={"pin": "13579", "on": False}).json()["required"] is False
     assert TestClient(create_app(box)).get("/api/state").status_code == 200
+
+
+def test_stereo_viz_and_nowplaying():
+    from dmxbox.nowplaying import parse_objects
+
+    an = Analyzer(iter(()), silence_seconds=2)
+    for blk in synth_source(bpm=124, seconds=9):
+        an.process(np.stack([blk, blk * 0.2], axis=1))      # stereo: pravý kanál tichší
+    s = an.snapshot()
+    assert len(s.viz_l) == 24 and len(s.viz_r) == 24
+    assert max(s.viz_l) > 0.1 and sum(s.viz_l) > sum(s.viz_r)
+    assert s.bpm_confident                                    # analýza ide ďalej z mixu
+    sample = {"type": "a{oa{sa{sv}}}", "data": [{
+        "/org/bluez/hci0/dev_AA/player0": {"org.bluez.MediaPlayer1": {
+            "Status": {"type": "s", "data": "playing"},
+            "Track": {"type": "a{sv}", "data": {"Title": {"type": "s", "data": "Chimera"},
+                                                "Artist": {"type": "s", "data": "Faders"}}}}},
+        "/org/bluez/hci0/dev_AA": {"org.bluez.Device1": {"Alias": {"type": "s", "data": "iPad"}}}}]}
+    t = parse_objects(sample)
+    assert (t.title, t.artist, t.source, t.status) == ("Chimera", "Faders", "iPad", "playing")
+    assert parse_objects({"type": "a{oa{sa{sv}}}", "data": [{}]}).title == ""

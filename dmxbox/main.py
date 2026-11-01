@@ -21,6 +21,7 @@ from .config import load_config, resolve
 from .dmx_out import DMXOut
 from .engine import Engine
 from .fixtures import load_rig
+from .nowplaying import NowPlaying
 from .scenario import ScenarioStore
 from .sim import GENRES, mix_source, synth_source
 from .state import Settings, Store
@@ -36,6 +37,7 @@ class Box:
     sources: dict[str, Callable] = field(default_factory=dict)   # "live" / "demo" → nový generátor
     scenarios: ScenarioStore | None = None
     auth: Auth | None = None
+    nowplaying: NowPlaying | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
@@ -70,7 +72,7 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     engine = Engine(rig, analyzer, store, out, fps=dc["fps"])
     return Box(store, analyzer, engine, out, LineIn(), sources,
                ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
-               Auth(resolve(cfg.get("security_file", "security.json"))))
+               Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying())
 
 
 def main() -> None:
@@ -98,6 +100,8 @@ def main() -> None:
     box.out.start()
     box.analyzer.start()
     box.engine.start()
+    if box.nowplaying:
+        box.nowplaying.start()
     try:
         uvicorn.run(create_app(box), host=cfg["web"]["host"],
                     port=args.port or cfg["web"]["port"], log_level="warning")

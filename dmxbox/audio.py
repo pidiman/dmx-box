@@ -47,6 +47,9 @@ class AudioState:
     drop_count: int = 0
     build_progress: float = 0.0
     features: dict = field(default_factory=dict)
+    # vizualizácia v appke: 24 pásiem (basy → výšky) pre ľavý a pravý kanál, 0–1
+    viz_l: list = field(default_factory=list)
+    viz_r: list = field(default_factory=list)
 
     @property
     def beats(self) -> float:
@@ -68,14 +71,14 @@ def default_monitor() -> str:
 
 
 def parec_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
-    """Nekonečný generátor blokov z parec. Pri páde ho znova spustí."""
+    """Nekonečný generátor stereo blokov (hop × 2) z parec. Pri páde ho znova spustí."""
     if not shutil.which("parec"):
         raise RuntimeError("parec nenájdený (apt install pulseaudio-utils)")
-    bytes_per_block = hop * 4
+    bytes_per_block = hop * 4 * 2
     while True:
         dev = default_monitor() if device == "auto" else device
         cmd = ["parec", "-d", dev, "--format=float32le", f"--rate={rate}",
-               "--channels=1", "--latency-msec=10"]
+               "--channels=2", "--latency-msec=10"]
         log.info("audio: %s", " ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
@@ -83,7 +86,7 @@ def parec_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
                 raw = proc.stdout.read(bytes_per_block)
                 if not raw or len(raw) < bytes_per_block:
                     break
-                yield np.frombuffer(raw, dtype=np.float32)
+                yield np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
         finally:
             proc.kill()
         log.warning("parec skončil, reštart o 1 s")
@@ -123,6 +126,51 @@ def device_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
                         dtype="float32", callback=cb):
         while True:
             yield q.get()
+
+
+# --- vizualizácia -------------------------------------------------------------
+
+class StereoViz:
+    """Spektrum pre appku: 24 logaritmických pásiem 40 Hz – 16 kHz pre L aj R.
+
+    Počíta sa len každý `every`-tý blok (~29×/s), stačí to na plynulú animáciu a šetrí Pi.
+    Hodnoty sú v dB vzhľadom na pomaly klesajúce maximum, takže sedia pri tichej aj hlasnej hudbe.
+    """
+
+    def __init__(self, rate: int, fft: int = 1024, bands: int = 24, every: int = 3):
+        self.fft, self.every, self.n = fft, every, 0
+        self.window = np.hanning(fft).astype(np.float32)
+        freqs = np.fft.rfftfreq(fft, 1.0 / rate)
+        edges = np.geomspace(40, min(16000, rate / 2 - 1), bands + 1)
+        self.idx = []
+        for lo, hi in zip(edges[:-1], edges[1:]):
+            sel = np.nonzero((freqs >= lo) & (freqs < hi))[0]
+            if not len(sel):                       # úzke basové pásma: najbližší bin
+                sel = np.array([int(np.argmin(np.abs(freqs - (lo + hi) / 2)))])
+            self.idx.append(sel)
+        self.buf = np.zeros((fft, 2), dtype=np.float32)
+        self.peak = -20.0
+        self.l = np.zeros(bands)
+        self.r = np.zeros(bands)
+
+    def _bands(self, x: np.ndarray) -> np.ndarray:
+        mag = np.abs(np.fft.rfft(x * self.window))
+        return np.array([20 * np.log10(mag[i].mean() + 1e-9) for i in self.idx])
+
+    def process(self, stereo: np.ndarray) -> None:
+        n = len(stereo)
+        self.buf = np.concatenate((self.buf[n:], stereo.astype(np.float32)))
+        self.n += 1
+        if self.n % self.every:
+            return
+        dl, dr = self._bands(self.buf[:, 0]), self._bands(self.buf[:, 1])
+        top = max(float(dl.max()), float(dr.max()))
+        self.peak = max(top, self.peak - 0.15)       # ~4 dB/s dolu
+        rng = 45.0                                    # zobrazený rozsah v dB
+        nl = np.clip((dl - (self.peak - rng)) / rng, 0, 1)
+        nr = np.clip((dr - (self.peak - rng)) / rng, 0, 1)
+        self.l = np.maximum(nl, self.l * 0.8)        # rýchly nábeh, plynulý pokles
+        self.r = np.maximum(nr, self.r * 0.8)
 
 
 # --- analyzátor ---------------------------------------------------------------
@@ -175,6 +223,7 @@ class Analyzer(threading.Thread):
         self.freqs = freqs
         self.music = MusicAnalyzer()
         self.buf = np.zeros(fft, dtype=np.float32)
+        self.viz = StereoViz(rate, fft)
         self.prev_mag: np.ndarray | None = None
         self.prev_lin: np.ndarray | None = None
         self._kick_lin_peak = 1e-6   # lineárny flux basy: kick vs. presak snare (log flux ich zrovná)
@@ -267,6 +316,11 @@ class Analyzer(threading.Thread):
             log.info("audio: zdroj vymenený")
 
     def process(self, block: np.ndarray) -> None:
+        if block.ndim == 2:                  # stereo: vizualizácia L/R, analýza z mixu
+            self.viz.process(block)
+            block = block.mean(axis=1)
+        else:
+            self.viz.process(np.repeat(block[:, None], 2, axis=1))
         n = len(block)
         self.buf = np.concatenate((self.buf[n:], block.astype(np.float32)))
         self._frames += 1
@@ -380,6 +434,7 @@ class Analyzer(threading.Thread):
                                  level=vals["level"], high=vals["high"], onset=kick_hit,
                                  onset_strength=strength, silent=silent)
         with self._lock:
+            s.viz_l, s.viz_r = self.viz.l.tolist(), self.viz.r.tolist()
             s.style, s.style_confidence = info.style, info.style_confidence
             s.style_scores = dict(info.scores)
             s.section, s.drop_count = info.section, info.drop_count
