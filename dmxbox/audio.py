@@ -78,7 +78,7 @@ def parec_source(device: str, rate: int, hop: int) -> Iterator[np.ndarray]:
     while True:
         dev = default_monitor() if device == "auto" else device
         cmd = ["parec", "-d", dev, "--format=float32le", f"--rate={rate}",
-               "--channels=2", "--latency-msec=10"]
+               "--channels=2", "--latency-msec=20"]
         log.info("audio: %s", " ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:

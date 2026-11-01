@@ -138,7 +138,7 @@ function live(d) {
   const a = d.audio;
   $("#bpm").textContent = a.silent ? "---" : Math.round(a.bpm);
   $("#beat").style.opacity = a.silent ? 0.15 : Math.max(0.15, 1 - a.phase * 1.6);
-  if (d.viz) { spec.l = d.viz.l; spec.r = d.viz.r; }
+  if (d.viz) { spec.l = d.viz.l.map((v) => v / 99); spec.r = d.viz.r.map((v) => v / 99); }
   spec.silent = a.silent;
   const tr = d.track, tb = $("#track");
   const showTrack = !!(tr && tr.title);

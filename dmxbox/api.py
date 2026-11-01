@@ -199,7 +199,7 @@ def create_app(box) -> FastAPI:
             "dmx": {"driver": box.out.driver, "connected": box.out.connected,
                     "frames": box.out.frames_sent},
             "line_in": box.line_in.on,
-            "viz": {"l": [round(x, 2) for x in a.viz_l], "r": [round(x, 2) for x in a.viz_r]},
+            "viz": {"l": [int(x * 99) for x in a.viz_l], "r": [int(x * 99) for x in a.viz_r]},   # 0–99, menšie správy
             "track": box.nowplaying.track.as_dict() if getattr(box, "nowplaying", None) else None,
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),

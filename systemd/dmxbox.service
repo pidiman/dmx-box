@@ -10,6 +10,8 @@ ExecStart=/usr/bin/python3 -m dmxbox.main
 Restart=always
 RestartSec=2
 Environment=PYTHONUNBUFFERED=1
+# zvuk (PipeWire, Bluetooth) má prednosť pred analýzou a webom – inak na Pi 3 hudba seká
+Nice=10
 
 [Install]
 WantedBy=default.target
