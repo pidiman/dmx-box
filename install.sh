@@ -1,20 +1,39 @@
 #!/usr/bin/env bash
 # DMX-BOX inštalácia na Raspberry Pi OS Lite 64-bit (Bookworm).
 # Spúšťaj ako bežný používateľ (nie root) z klonu repa:
+#   sudo apt-get install -y git
 #   git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
 #   ./install.sh --hotspot-pass 'tajne-heslo' [--spotify]
+#
+# Parametre (všetky voliteľné, skript sa dá spustiť znova – nič nerozbije):
+#   --hotspot-pass HESLO     záložný hotspot DMX-BOX, keď nie je známa Wi-Fi (min. 8 znakov)
+#   --spotify                Spotify Connect „DMX-BOX“ (librespot; treba Premium)
+#   --wifi SSID HESLO        pridať Wi-Fi sieť (dá sa zopakovať pre viac sietí)
+#   --hostname MENO          meno v sieti, web na http://MENO.local (predvolene dmx-box)
+#   --country KÓD            krajina Wi-Fi, potrebná pre 5 GHz (predvolene SK)
+#   --bt-name MENO           meno v Bluetooth zozname (predvolene DMX-BOX)
+# Neskoršie zmeny bez reinštalácie: príkaz `dmxbox help` (docs/PREVADZKA.md).
 set -euo pipefail
 
 HOTSPOT_PASS=""
 SPOTIFY=0
+HOSTNAME_NEW="dmx-box"
+COUNTRY="SK"
+BT_NAME="DMX-BOX"
+WIFI=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --hotspot-pass) HOTSPOT_PASS="$2"; shift 2 ;;
     --spotify) SPOTIFY=1; shift ;;
-    -h|--help) sed -n '2,6p' "$0"; exit 0 ;;
-    *) echo "neznámy parameter: $1"; exit 1 ;;
+    --wifi) WIFI+=("$2" "$3"); shift 3 ;;
+    --hostname) HOSTNAME_NEW="$2"; shift 2 ;;
+    --country) COUNTRY="$2"; shift 2 ;;
+    --bt-name) BT_NAME="$2"; shift 2 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    *) echo "neznámy parameter: $1 (./install.sh --help)"; exit 1 ;;
   esac
 done
+[[ -z "$HOTSPOT_PASS" || ${#HOTSPOT_PASS} -ge 8 ]] || { echo "Heslo hotspotu musí mať aspoň 8 znakov."; exit 1; }
 
 [[ $EUID -eq 0 ]] && { echo "Nespúšťaj ako root, sudo si skript pýta sám."; exit 1; }
 REPO="$(cd "$(dirname "$0")" && pwd)"
@@ -44,11 +63,11 @@ elif ! grep -q '^dtparam=audio=off' "$CFG"; then
 fi
 
 say "Bluetooth: DMX-BOX ako reproduktor"
-sudo python3 - <<'PY'
-import re
+sudo BT_NAME="$BT_NAME" python3 - <<'PY'
+import os, re
 p = "/etc/bluetooth/main.conf"
 s = open(p).read()
-want = {"Name": "DMX-BOX", "Class": "0x200414", "DiscoverableTimeout": "0",
+want = {"Name": os.environ["BT_NAME"], "Class": "0x200414", "DiscoverableTimeout": "0",
         "AlwaysPairable": "true", "JustWorksRepairing": "always"}
 for k, v in want.items():
     pat = re.compile(rf"^#?\s*{k}\s*=.*$", re.M)
@@ -65,8 +84,19 @@ echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-dmxbox
 sudo sysctl -p /etc/sysctl.d/99-dmxbox.conf
 
 say "Hostname a Wi-Fi krajina"
-sudo hostnamectl set-hostname dmx-box
-sudo raspi-config nonint do_wifi_country SK || true
+sudo hostnamectl set-hostname "$HOSTNAME_NEW"
+sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME_NEW/" /etc/hosts
+sudo raspi-config nonint do_wifi_country "$COUNTRY" || true
+
+for ((i = 0; i < ${#WIFI[@]}; i += 2)); do
+  say "Wi-Fi: ${WIFI[i]}"
+  sudo nmcli con delete "${WIFI[i]}" &>/dev/null || true
+  sudo nmcli con add type wifi ifname wlan0 con-name "${WIFI[i]}" ssid "${WIFI[i]}" \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.psk "${WIFI[i+1]}" connection.autoconnect yes >/dev/null
+done
+
+say "Príkaz dmxbox (správa Wi-Fi, BT, Spotify, audio)"
+sudo install -m 755 "$REPO/scripts/dmxbox" /usr/local/bin/dmxbox
 
 if [[ -n "$HOTSPOT_PASS" ]]; then
   say "Fallback hotspot DMX-BOX (5 GHz, kanál 36)"
@@ -78,6 +108,7 @@ if [[ -n "$HOTSPOT_PASS" ]]; then
   sudo install -m 755 "$REPO/scripts/wifi-fallback.sh" /usr/local/bin/dmxbox-wifi-fallback
   sudo install -m 644 "$REPO/systemd/wifi-fallback.service" /etc/systemd/system/
   sudo systemctl daemon-reload && sudo systemctl enable wifi-fallback
+  sudo systemctl restart wifi-fallback
 else
   echo "Hotspot preskočený (pridaj --hotspot-pass 'heslo')."
 fi
@@ -94,7 +125,8 @@ if [[ $SPOTIFY -eq 1 ]]; then
   install -m 644 "$REPO/systemd/librespot.service" "$HOME/.config/systemd/user/"
 fi
 
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export XDG_RUNTIME_DIR
 systemctl --user daemon-reload
 systemctl --user enable --now pipewire pipewire-pulse wireplumber
 systemctl --user enable dmxbox
@@ -103,11 +135,12 @@ systemctl --user enable dmxbox
 say "Hotovo"
 cat <<EOF
 Ďalej:
-  1. sudo reboot
-  2. Zapoj UCA202 a Lixada, potom:  lsusb
-  3. Výstup zvuku na UCA202:        wpctl status && wpctl set-default <ID>
-  4. Test DMX:                      python3 tools/dmx_test.py walk all
-  5. Test audia:                    python3 tools/audio_meter.py
-  6. Spustenie:                     systemctl --user start dmxbox && journalctl --user -u dmxbox -f
-  7. Ovládanie:                     http://dmx-box.local
+  1. sudo reboot   (potom: ssh $USER@$HOSTNAME_NEW.local)
+  2. Zapoj UCA202 a Lixada:         dmxbox status
+  3. Výstup zvuku na UCA202:        dmxbox audio out usb
+  4. Test DMX:                      dmxbox test dmx walk all
+  5. Test audia:                    dmxbox audio meter
+  6. Spustenie a logy:              dmxbox start && dmxbox logs
+  7. Ovládanie:                     http://$HOSTNAME_NEW.local
+  Všetky príkazy: dmxbox help   |   návod: docs/PREVADZKA.md
 EOF

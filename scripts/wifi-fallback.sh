@@ -1,16 +1,36 @@
 #!/usr/bin/env bash
-# Po štarte počká na klientsku Wi-Fi; ak sa nepripojí, zapne hotspot dmx-hotspot.
+# Strážca Wi-Fi: keď box nie je pripojený na žiadnu známu Wi-Fi, zapne hotspot DMX-BOX.
+# Beží stále (nie len pri štarte), takže reaguje aj na stratu Wi-Fi počas behu
+# (presun na inú adresu, vypnutý router). Späť na Wi-Fi: dmxbox wifi connect "SSID"
+# alebo reštart boxu v dosahu známej siete.
 set -u
-WAIT=${WAIT:-30}
+HOTSPOT=dmx-hotspot
+BOOT_WAIT=${BOOT_WAIT:-40}     # po štarte: koľko s dať NetworkManageru na pripojenie
+LOST_WAIT=${LOST_WAIT:-60}     # počas behu: koľko s bez Wi-Fi, kým zapne hotspot
+STEP=5
 
-for _ in $(seq 1 "$WAIT"); do
-  if nmcli -t -f TYPE,STATE,CONNECTION device | grep -q '^wifi:connected:' \
-     && ! nmcli -t -f TYPE,STATE,CONNECTION device | grep -q ':dmx-hotspot$'; then
-    echo "Wi-Fi klient pripojený, hotspot netreba"
-    exit 0
-  fi
-  sleep 1
+state() {  # client | hotspot | none
+  local line; line=$(nmcli -t -f TYPE,STATE,CONNECTION device | grep '^wifi:' | head -1)
+  case "$line" in
+    "wifi:connected:$HOTSPOT") echo hotspot ;;
+    wifi:connected:*) echo client ;;
+    *) echo none ;;
+  esac
+}
+
+down=0
+limit=$BOOT_WAIT
+while true; do
+  case "$(state)" in
+    client)  down=0; limit=$LOST_WAIT ;;
+    hotspot) down=0 ;;
+    none)
+      down=$((down + STEP))
+      if (( down >= limit )); then
+        echo "Žiadna Wi-Fi ${down} s → zapínam hotspot DMX-BOX"
+        nmcli con up "$HOTSPOT" || echo "hotspot sa nepodarilo zapnúť"
+        down=0
+      fi ;;
+  esac
+  sleep "$STEP"
 done
-
-echo "Žiadna Wi-Fi sieť, zapínam hotspot DMX-BOX"
-nmcli con up dmx-hotspot

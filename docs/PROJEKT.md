@@ -443,6 +443,8 @@ Frontend je čistý HTML + CSS + vanilla JS (bez buildu), s `manifest.json` a se
 
 Doma sa box pripája do domácej Wi-Fi na 5 GHz. Mimo domu, keď tú sieť nenájde, spustí vlastný hotspot DMX-BOX. Tablet sa pripojí tam a ovláda box cez rovnakú PWA.
 
+Strážca `wifi-fallback` beží stále: hotspot zapne 40 s po štarte bez Wi-Fi a tiež keď Wi-Fi vypadne počas behu na 60 s. Siete, hotspot, Bluetooth, Spotify a výstup zvuku sa menia príkazom `dmxbox` ([PREVADZKA.md](PREVADZKA.md)).
+
 **Domáca Wi-Fi na 5 GHz:**
 
 ```bash
@@ -498,7 +500,9 @@ dmx-box/
 │   ├── librespot.service   # user služba (Spotify Connect)
 │   ├── bt-agent.service    # systémová
 │   └── wifi-fallback.service
-├── scripts/wifi-fallback.sh
+├── scripts/
+│   ├── dmxbox              # správa boxu: wifi, hotspot, bt, spotify, audio, update
+│   └── wifi-fallback.sh    # strážca Wi-Fi → hotspot
 ├── tools/
 │   ├── dmx_test.py         # raw / walk / sweep kanálov podľa fixtures.yaml
 │   └── audio_meter.py      # BPM, beat a pásma v termináli

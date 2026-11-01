@@ -1,13 +1,14 @@
-# systémová služba: bez domácej Wi-Fi spustí hotspot DMX-BOX
+# systémová služba: bez známej Wi-Fi zapne hotspot DMX-BOX (pri štarte aj počas behu)
 [Unit]
 Description=Wi-Fi fallback hotspot pre DMX-BOX
 After=NetworkManager.service
 Wants=NetworkManager.service
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/bin/dmxbox-wifi-fallback
-RemainAfterExit=yes
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

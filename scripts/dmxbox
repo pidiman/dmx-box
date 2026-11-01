@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# dmxbox – správa DMX-BOX na Raspberry Pi (Wi-Fi, hotspot, Bluetooth, Spotify, audio, služba).
+# install.sh ho nainštaluje do /usr/local/bin/dmxbox. Spúšťaj ako bežný používateľ (nie sudo).
+#
+#   dmxbox status                     prehľad: sieť, BT, audio, DMX, služby
+#   dmxbox help                       všetky príkazy
+set -uo pipefail
+
+REPO="${DMXBOX_REPO:-$HOME/dmx-box}"
+HOTSPOT=dmx-hotspot
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+c() { printf '\033[1;35m%s\033[0m\n' "$*"; }
+ok() { printf '  \033[32m●\033[0m %s\n' "$*"; }
+no() { printf '  \033[31m●\033[0m %s\n' "$*"; }
+die() { echo "Chyba: $*" >&2; exit 1; }
+need() { [[ -n "${1:-}" ]] || die "chýba parameter – pozri: dmxbox help"; }
+api() {  # api POST /api/settings '{"line_in":true}'
+  local port; port=$(grep -A3 '^web:' "$REPO/config.yaml" 2>/dev/null | awk '/port:/{print $2}')
+  curl -fsS -X "$1" "http://localhost:${port:-80}$2" -H 'content-type: application/json' ${3:+-d "$3"}
+}
+svc_state() { systemctl "$@" is-active 2>/dev/null | head -1; }
+
+# --- status -------------------------------------------------------------------
+cmd_status() {
+  c "Sieť"
+  local wifi; wifi=$(nmcli -t -f TYPE,STATE,CONNECTION device | awk -F: '$1=="wifi"{print $2" "$3}')
+  if [[ "$wifi" == "connected $HOTSPOT" ]]; then
+    ok "HOTSPOT DMX-BOX zapnutý → tablet: Wi-Fi DMX-BOX, http://10.42.0.1"
+  elif [[ "$wifi" == connected* ]]; then
+    ok "Wi-Fi: ${wifi#connected } ($(hostname -I | awk '{print $1}'))"
+  else
+    no "Wi-Fi nepripojená ($wifi)"
+  fi
+  echo "  web: http://$(hostname).local  |  fallback hotspot: $(systemctl is-enabled wifi-fallback 2>/dev/null || echo nie)"
+
+  c "Bluetooth"
+  local bt; bt=$(bluetoothctl show 2>/dev/null)
+  grep -q 'Powered: yes' <<<"$bt" && ok "zapnutý, meno: $(awk -F': ' '/Alias/{print $2}' <<<"$bt"), viditeľný: $(awk -F': ' '/Discoverable:/{print $2}' <<<"$bt")" || no "vypnutý"
+  bluetoothctl devices Connected 2>/dev/null | sed 's/^Device /  ↔ pripojené: /'
+  echo "  spárované: $(bluetoothctl devices Paired 2>/dev/null | wc -l)"
+
+  c "Audio"
+  local sink; sink=$(pactl get-default-sink 2>/dev/null)
+  [[ -n "$sink" ]] && ok "výstup: $sink" || no "PipeWire nebeží"
+  pactl list short sink-inputs 2>/dev/null | grep -q . && ok "niečo hrá" || echo "  ticho (nič nehrá)"
+  echo "  line-in: $(pactl list short modules 2>/dev/null | grep -q module-loopback && echo zapnutý || echo vypnutý)"
+
+  c "USB"
+  lsusb | grep -qi '16c0:05dc' && ok "DMX dongle (uDMX/Lixada)" || no "DMX dongle nenájdený"
+  lsusb | grep -qiE '08bb:29|burr-brown|uca' && ok "zvuková karta UCA202" || no "UCA202 nenájdená"
+
+  c "Služby"
+  for s in dmxbox librespot pipewire wireplumber; do
+    local st; st=$(svc_state --user "$s")
+    [[ "$st" == active ]] && ok "$s" || { [[ "$s" == librespot ]] && ! systemctl --user cat librespot &>/dev/null && echo "  spotify: nenainštalovaný (dmxbox spotify on)" || no "$s ($st)"; }
+  done
+  for s in bluetooth bt-agent NetworkManager; do
+    [[ "$(svc_state "$s")" == active ]] && ok "$s" || no "$s ($(svc_state "$s"))"
+  done
+  local thr; thr=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
+  [[ -z "$thr" || "$thr" == 0x0 ]] && ok "napájanie OK" || no "napájanie/teplota: throttled=$thr (slabý zdroj?)"
+}
+
+# --- Wi-Fi ----------------------------------------------------------------------
+cmd_wifi() {
+  case "${1:-list}" in
+    list)
+      nmcli -f NAME,TYPE,AUTOCONNECT,AUTOCONNECT-PRIORITY,DEVICE con show | grep -E 'NAME|wifi' ;;
+    scan)
+      nmcli dev wifi list --rescan yes ;;
+    add)   # dmxbox wifi add "SSID" "heslo" [priorita]
+      need "${2:-}"; need "${3:-}"
+      sudo nmcli con delete "$2" &>/dev/null
+      sudo nmcli con add type wifi ifname wlan0 con-name "$2" ssid "$2" \
+        wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$3" \
+        connection.autoconnect yes connection.autoconnect-priority "${4:-10}" >/dev/null
+      echo "Uložené: $2. Box sa naň pripojí sám, keď bude v dosahu."
+      echo "Ak práve beží hotspot, prepni hneď: dmxbox wifi connect \"$2\"" ;;
+    connect)
+      need "${2:-}"
+      echo "Prepínam na $2 (SSH cez hotspot sa preruší)…"
+      sudo nmcli con down "$HOTSPOT" &>/dev/null
+      sudo nmcli con up "$2" || { echo "Nepodarilo sa, späť na hotspot"; sudo nmcli con up "$HOTSPOT"; } ;;
+    del|remove)
+      need "${2:-}"; sudo nmcli con delete "$2" ;;
+    *) die "wifi list|scan|add SSID HESLO [priorita]|connect SSID|del SSID" ;;
+  esac
+}
+
+cmd_hotspot() {
+  case "${1:-status}" in
+    on)   sudo nmcli con up "$HOTSPOT" && echo "Hotspot DMX-BOX zapnutý → http://10.42.0.1" ;;
+    off)  sudo nmcli con down "$HOTSPOT"; echo "Hotspot vypnutý, NetworkManager sa pripojí na známu Wi-Fi."
+          systemctl is-enabled -q wifi-fallback && echo "(bez Wi-Fi sa hotspot zapne znova do ~1 min – vypni: dmxbox hotspot auto off)" ;;
+    pass) need "${2:-}"; [[ ${#2} -ge 8 ]] || die "heslo musí mať aspoň 8 znakov"
+          sudo nmcli con modify "$HOTSPOT" wifi-sec.psk "$2" && echo "Heslo zmenené (platí od ďalšieho zapnutia hotspotu)." ;;
+    auto) case "${2:-}" in
+            on)  sudo systemctl enable --now wifi-fallback && echo "Automatický hotspot zapnutý." ;;
+            off) sudo systemctl disable --now wifi-fallback && echo "Automatický hotspot vypnutý." ;;
+            *) die "hotspot auto on|off" ;;
+          esac ;;
+    status) nmcli -t -f NAME,DEVICE con show --active | grep -q "^$HOTSPOT:" && echo "beží" || echo "nebeží"
+            echo "auto: $(systemctl is-enabled wifi-fallback 2>/dev/null || echo nie)" ;;
+    *) die "hotspot on|off|status|pass HESLO|auto on|off" ;;
+  esac
+}
+
+# --- Bluetooth ------------------------------------------------------------------
+cmd_bt() {
+  case "${1:-list}" in
+    list)    echo "Spárované:"; bluetoothctl devices Paired
+             echo "Pripojené:"; bluetoothctl devices Connected ;;
+    pair)    # mobil: box je stále viditeľný; tu len na istotu otvoríme párovanie
+             bluetoothctl power on >/dev/null; bluetoothctl discoverable on >/dev/null; bluetoothctl pairable on >/dev/null
+             echo "DMX-BOX je viditeľný. V mobile: Bluetooth → DMX-BOX (bez PIN)." ;;
+    hide)    bluetoothctl discoverable off >/dev/null; echo "Neviditeľný (spárované zariadenia sa pripoja ďalej). Späť: dmxbox bt pair" ;;
+    forget)  need "${2:-}"; bluetoothctl remove "$2" ;;
+    forget-all)
+             bluetoothctl devices Paired | awk '{print $2}' | xargs -r -n1 bluetoothctl remove ;;
+    disconnect) bluetoothctl disconnect ${2:-} ;;
+    connect) # spárovať BT reproduktor/zariadenie podľa MAC (najprv: dmxbox bt scan)
+             need "${2:-}"
+             bluetoothctl pair "$2"; bluetoothctl trust "$2"; bluetoothctl connect "$2" ;;
+    scan)    echo "Hľadám 15 s…"; timeout 15 bluetoothctl --timeout 15 scan on >/dev/null 2>&1; bluetoothctl devices ;;
+    name)    need "${2:-}"; sudo sed -i "s/^Name = .*/Name = $2/" /etc/bluetooth/main.conf
+             sudo systemctl restart bluetooth bt-agent; echo "BT meno: $2" ;;
+    on|off)  bluetoothctl power "$1" ;;
+    *) die "bt list|pair|hide|scan|connect MAC|disconnect [MAC]|forget MAC|forget-all|name MENO|on|off" ;;
+  esac
+}
+
+# --- Spotify --------------------------------------------------------------------
+cmd_spotify() {
+  case "${1:-status}" in
+    on)
+      if ! command -v librespot >/dev/null; then
+        echo "Inštalujem librespot (raspotify)…"
+        curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
+        sudo systemctl disable --now raspotify || true
+      fi
+      install -m 644 "$REPO/systemd/librespot.service" "$HOME/.config/systemd/user/"
+      systemctl --user daemon-reload && systemctl --user enable --now librespot
+      echo "Spotify Connect zapnutý: v appke Spotify → zariadenia → DMX-BOX (treba Premium a internet)." ;;
+    off)    systemctl --user disable --now librespot && echo "Spotify Connect vypnutý." ;;
+    restart) systemctl --user restart librespot ;;
+    status) echo "$(svc_state --user librespot)" ;;
+    *) die "spotify on|off|restart|status" ;;
+  esac
+}
+
+# --- Audio ----------------------------------------------------------------------
+cmd_audio() {
+  case "${1:-list}" in
+    list)    wpctl status | sed -n '/Audio/,/Video/p' ;;
+    out)     # dmxbox audio out <ID z wpctl status | časť mena, napr. usb / bluez>
+             need "${2:-}"
+             if [[ "$2" =~ ^[0-9]+$ ]]; then wpctl set-default "$2"
+             else local s; s=$(pactl list short sinks | awk -v n="$2" 'index($2,n){print $2; exit}')
+                  [[ -n "$s" ]] || die "výstup '$2' nenájdený (dmxbox audio list)"; pactl set-default-sink "$s"; fi
+             echo "Výstup: $(pactl get-default-sink)" ;;
+    volume)  need "${2:-}"; wpctl set-volume @DEFAULT_AUDIO_SINK@ "${2%\%}%" ;;
+    linein)  case "${2:-}" in
+               on|off) api POST /api/settings "{\"line_in\": $([[ $2 == on ]] && echo true || echo false)}" >/dev/null && echo "line-in $2" ;;
+               *) die "audio linein on|off" ;;
+             esac ;;
+    delay)   need "${2:-}"; api POST /api/settings "{\"light_delay_ms\": $2}" >/dev/null && echo "light delay $2 ms" ;;
+    meter)   cd "$REPO" && python3 tools/audio_meter.py "${@:2}" ;;
+    *) die "audio list|out ID|MENO|volume 0-100|linein on|off|delay MS|meter" ;;
+  esac
+}
+
+# --- služba, aktualizácia ------------------------------------------------------------
+cmd_update() {
+  cd "$REPO" || die "repo $REPO neexistuje"
+  git pull --ff-only || die "git pull zlyhal (lokálne zmeny? git status)"
+  pip install --break-system-packages --user -q -r requirements.txt 2>/dev/null || true
+  install -m 644 systemd/dmxbox.service "$HOME/.config/systemd/user/"
+  sudo install -m 755 scripts/dmxbox /usr/local/bin/dmxbox
+  sudo install -m 755 scripts/wifi-fallback.sh /usr/local/bin/dmxbox-wifi-fallback
+  systemctl --user daemon-reload && systemctl --user restart dmxbox
+  echo "Aktualizované na $(git log --oneline -1)"
+}
+
+cmd_help() {
+  cat <<'EOF'
+dmxbox – správa DMX-BOX
+
+  status                          prehľad: Wi-Fi/hotspot, BT, audio, USB, služby, napájanie
+  start | stop | restart          aplikácia dmxbox (svetlá + web)
+  logs [dmxbox|librespot|bt|wifi] živé logy (Ctrl+C koniec)
+  update                          git pull + reštart
+  test dmx [walk|sweep|raw …]     test kanálov (služba sa na chvíľu zastaví)
+
+  wifi list | scan                uložené / viditeľné siete
+  wifi add "SSID" "heslo" [prio]  nová sieť (aj mimo dosahu; vyššia priorita = prednosť)
+  wifi connect "SSID"             prepnúť hneď (z hotspotu)
+  wifi del "SSID"                 zmazať
+
+  hotspot on | off | status       Wi-Fi DMX-BOX (10.42.0.1)
+  hotspot pass "nové-heslo"       zmeniť heslo hotspotu
+  hotspot auto on | off           automaticky zapnúť, keď nie je známa Wi-Fi
+
+  bt list                         spárované / pripojené zariadenia
+  bt pair | hide                  viditeľný pre nový mobil / skryť
+  bt forget MAC | forget-all      zabudnúť zariadenie
+  bt scan | connect MAC           nájsť a pripojiť BT reproduktor
+  bt name "MENO"                  meno v Bluetooth zozname
+
+  spotify on | off | status       Spotify Connect (Premium + internet)
+
+  audio list                      výstupy/vstupy (ID pre wpctl)
+  audio out usb | bluez | ID      kam ide zvuk (UCA202 kábel / BT reproduktor)
+  audio volume 0-100              hlasitosť výstupu
+  audio linein on | off           line-in UCA202 IN → výstup
+  audio delay MS                  oneskorenie svetiel (BT reproduktor ~150–250)
+  audio meter                     BPM a pásma v termináli
+EOF
+}
+
+case "${1:-help}" in
+  status|st) cmd_status ;;
+  start|stop|restart) systemctl --user "$1" dmxbox ;;
+  logs) case "${2:-dmxbox}" in
+          dmxbox|librespot) journalctl --user -u "$2" -f -n 50 ;;
+          bt) journalctl -u bluetooth -u bt-agent -f -n 50 ;;
+          wifi) journalctl -u NetworkManager -u wifi-fallback -f -n 50 ;;
+          *) die "logs dmxbox|librespot|bt|wifi" ;;
+        esac ;;
+  update) cmd_update ;;
+  test) [[ "${2:-}" == dmx ]] || die "test dmx [walk|sweep|raw …]"
+        systemctl --user stop dmxbox; cd "$REPO" && python3 tools/dmx_test.py "${@:3}"
+        systemctl --user start dmxbox ;;
+  wifi) shift; cmd_wifi "$@" ;;
+  hotspot) shift; cmd_hotspot "$@" ;;
+  bt|bluetooth) shift; cmd_bt "$@" ;;
+  spotify) shift; cmd_spotify "$@" ;;
+  audio) shift; cmd_audio "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *) echo "neznámy príkaz: $1"; cmd_help; exit 1 ;;
+esac

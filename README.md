@@ -39,12 +39,15 @@ Kompletný popis projektu je v [docs/PROJEKT.md](docs/PROJEKT.md):
 Na Raspberry Pi 3B+ (Raspberry Pi OS Lite 64-bit):
 
 ```bash
+sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/pidiman/dmx-box ~/dmx-box && cd ~/dmx-box
-./install.sh --hotspot-pass 'tajne-heslo' --spotify
+./install.sh --hotspot-pass 'tajne-heslo' --spotify --wifi "DomaWiFi" "heslo"
 sudo reboot
 ```
 
 Ovládanie z tabletu: `http://dmx-box.local` (pridaj na plochu ako appku).
+
+Správa na Pi príkazom **`dmxbox`**: `dmxbox status`, `dmxbox wifi add …`, `dmxbox hotspot …`, `dmxbox bt …`, `dmxbox spotify on|off`, `dmxbox audio …`, `dmxbox update`. Všetky parametre inštalácie, spôsoby spustenia a postupy pri zmene Wi-Fi, mobilu či reproduktora sú v **[docs/PREVADZKA.md](docs/PREVADZKA.md)**.
 
 Bez hardvéru (vývoj na PC/Mac):
 
