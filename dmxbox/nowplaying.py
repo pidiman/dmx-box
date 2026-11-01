@@ -99,14 +99,19 @@ class AirPlayMeta(threading.Thread):
                 except ValueError:
                     data = ""
             if typ == "core" and code == "minm":
+                # nová skladba = hrá sa, aj keď sme začiatok prehrávania (pbeg) zmeškali,
+                # napr. po reštarte boxu počas hrania
                 self.track.title = data
+                self.playing = True
+                if self.track.status != "paused":
+                    self.track.status = "playing"
             elif typ == "core" and code == "asar":
                 self.track.artist = data
             elif typ == "core" and code == "asal":
                 self.track.album = data
             elif typ == "ssnc" and code == "snam":
                 self.track.source = data
-            elif typ == "ssnc" and code in ("pbeg", "prsm"):
+            elif typ == "ssnc" and code in ("pbeg", "prsm", "prgr"):
                 self.playing, self.track.status = True, "playing"
             elif typ == "ssnc" and code == "pfls":
                 self.track.status = "paused"

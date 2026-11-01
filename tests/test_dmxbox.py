@@ -602,3 +602,17 @@ def test_generic_laser_follows_laser_switch_and_holds_values(tmp_path):
     assert bad.status_code == 400 and "prekrývali" in bad.text
     prof = next(p for p in c.get("/api/rig").json()["profiles"] if p["id"] == pid)
     assert len(prof["modes"]["10ch"]) == 10
+
+
+def test_airplay_title_after_missed_start():
+    """Box reštartovaný počas hrania: pbeg neprišiel, názov skladby sa aj tak zobrazí."""
+    import base64
+    from dmxbox.nowplaying import NowPlaying
+    np_ = NowPlaying(); np_.available = False
+    def item(t, c, d=None):
+        x = f"<item><type>{t.encode().hex()}</type><code>{c.encode().hex()}</code><length>{len(d or '')}</length>"
+        if d is not None:
+            x += f"\n<data encoding=\"base64\">\n{base64.b64encode(d.encode()).decode()}</data>"
+        return x + "</item>\n"
+    np_.airplay.feed(item("core", "minm", "Strobe") + item("core", "asar", "deadmau5"))
+    assert np_.track.title == "Strobe" and np_.track.status == "playing"
