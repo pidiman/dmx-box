@@ -839,3 +839,29 @@ def test_audio_output_skips_airplay_buffer(monkeypatch):
     system.audio_output("alsa_output.jack")
     moved = [c[2] for c in calls if c[:2] == ("pactl", "move-sink-input")]
     assert moved == ["72"]
+
+
+def test_bt_speaker_stall_fix(tmp_path, monkeypatch):
+    import dmxbox.btspeaker as bs
+    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
+    fake = _FakeBT()
+    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w.tick()                                           # pripojený, zapamätaný
+    fake.calls.clear()
+    w.kernel_line("Bluetooth: hci0: link tx timeout")
+    w.kernel_line("iné hlásenie bez súvisu")
+    w._last_fix = 0.0
+    w.tick()
+    assert ("bluetoothctl", "disconnect", "AA:BB:CC:DD:EE:FF") in fake.calls
+    assert ("bluetoothctl", "--timeout", "15", "connect", "AA:BB:CC:DD:EE:FF") in fake.calls
+    assert w.info()["stall_fixes"] == 1
+    # vyriešené: ďalší tick už nič nerobí
+    fake.calls.clear(); w.tick()
+    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
+    # zamrznutie hneď po oprave (< 20 s): počká, neopakuje v slučke
+    w.kernel_line("Bluetooth: hci0: killing stalled connection aa:bb:cc:dd:ee:ff")
+    w.tick()
+    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
+    # pozastavené ručným odpojením → neopravuje
+    w._last_fix = 0.0; w.manual_disconnect("AA:BB:CC:DD:EE:FF"); w.state["paused"] = True
+    w.tick()

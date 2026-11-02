@@ -117,6 +117,9 @@ for ((i = 0; i < ${#WIFI[@]}; i += 2)); do
 done
 
 say "Ovládanie systému z webu (Wi-Fi, hotspot, reštart) bez hesla"
+# čítanie správ jadra bez sudo (strážca BT reproduktora rozpozná zamrznuté spojenie)
+sudo usermod -aG systemd-journal "$USER" || true
+
 SUDOERS=/etc/sudoers.d/dmxbox
 sudo tee "$SUDOERS" >/dev/null <<EOF
 # DMX-BOX web: len tieto príkazy bez hesla (install.sh)
