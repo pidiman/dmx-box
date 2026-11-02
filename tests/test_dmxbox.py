@@ -695,3 +695,56 @@ def test_bt_speaker_autoreconnect(tmp_path):
     assert w2.info()["reconnecting"] and "Failed" in w2.info()["error"]
     w2.forget("AA:BB:CC:DD:EE:FF")
     assert w2.info()["mac"] is None
+
+
+def test_session_log(tmp_path):
+    import json as _json
+    import time as _t
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.nowplaying import Track, stub
+    from dmxbox.sessionlog import SessionLog
+    box = _box(tmp_path)
+    box.nowplaying = stub(); box.nowplaying.track = Track(title="Chimera", artist="Faders", status="playing")
+    box.slog = sl = SessionLog(tmp_path / "logs", box, flush_s=999)
+    c = TestClient(create_app(box))
+    sl.sample(); sl.sample()
+    # posuvník master: 3 požiadavky → 1 záznam s poslednou hodnotou; PIN sa nezapíše
+    for v in (0.2, 0.5, 0.8):
+        c.post("/api/settings", json={"master": v})
+    c.post("/api/auth/pin", json={"pin": "", "new_pin": "1234"})
+    c.post("/api/system/wifi", json={"ssid": "X", "password": "tajne123"})
+    sl._release_actions(force=True)
+    sl.flush()
+    day = sl.files()[0]["day"]
+    recs = SessionLog.read(sl.path_of(day))
+    evs = [r["ev"] for r in recs]
+    assert "track" in evs and "fx" in evs
+    acts = [r for r in recs if r["ev"] == "action"]
+    master = [a for a in acts if a["path"] == "/api/settings"]
+    assert len(master) == 1 and master[0]["body"]["master"] == 0.8
+    raw = sl.path_of(day).read_text()
+    assert "1234" not in raw and "tajne123" not in raw and not any(a["path"].startswith("/api/auth") for a in acts)
+    # súhrn a sťahovanie cez API
+    s = c.get(f"/api/log/summary/{day}").json()
+    assert s["tracks"] == 1 and s["actions"] >= 2
+    assert c.get(f"/api/log/download/{day}").status_code == 200
+    assert c.get("/api/log/download/../../etc").status_code == 404
+    assert c.get("/api/log/download-all").content[:2] == b"PK"
+    # vypnutie: nič nové sa nezapisuje, nastavenie prežije
+    c.post("/api/log/enabled", json={"on": False})
+    n = len(SessionLog.read(sl.path_of(day)))
+    sl.event("music", bpm=120); sl.flush()
+    assert len(SessionLog.read(sl.path_of(day))) == n
+    assert SessionLog(tmp_path / "logs").enabled is False
+
+
+def test_session_log_prune(tmp_path):
+    from dmxbox.sessionlog import SessionLog
+    d = tmp_path / "logs"; d.mkdir()
+    for i in range(1, 20):
+        (d / f"2026-10-{i:02d}.jsonl").write_text("x" * 1000)
+    sl = SessionLog(d, keep_days=14, max_mb=0.01)
+    sl.event("start"); sl.flush()
+    files = sorted(p.name for p in d.glob("*.jsonl"))
+    assert len(files) <= 14 and sum((d / f).stat().st_size for f in files) <= 0.01 * 1024 * 1024 + 2000

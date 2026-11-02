@@ -202,7 +202,29 @@ Treba Spotify Premium a internet. V režime hotspot internet nie je, preto tam o
 | `/etc/bluetooth/main.conf` | BT meno a viditeľnosť | `dmxbox bt name` |
 | NetworkManager (`dmx-hotspot` a Wi-Fi siete) | Wi-Fi a hotspot | `dmxbox wifi …`, `dmxbox hotspot …` |
 
-## 5. Riešenie problémov
+## 5. Záznam prevádzky a logy
+
+**Záznam prevádzky** (Nastavenia boxu → Záznam prevádzky) zapisuje do `logs/RRRR-MM-DD.jsonl` jeden riadok na udalosť:
+skladba, rozpoznaný štýl a BPM (každých 30 s aj skóre žánrov), časti skladby a dropy, efekty AUTO, ručné zásahy
+v appke (bez PINov a hesiel), CPU/RAM/SD/teplota každú minútu, výpadky DMX donglu a BT reproduktora, varovania a chyby.
+Zapisuje sa po dávkach každých 30 s; uchováva sa 14 dní, max. 20 MB. V appke je pri každom dni **Súhrn** a **Stiahnuť**,
+dole **Stiahnuť ZIP** – ten pošli na analýzu (doladenie žánrov, BPM, dropov, AUTO).
+
+```bash
+tail -f ~/dmx-box/logs/$(date +%F).jsonl          # živo
+jq -c 'select(.ev=="track" or .ev=="style")' ~/dmx-box/logs/*.jsonl   # skladby a rozpoznaný štýl
+```
+
+**Systémový log** (štarty, chyby) – Raspberry Pi OS ho predvolene drží len v RAM. Trvalo (max. 50 MB):
+
+```bash
+sudo mkdir -p /var/log/journal /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=50M\n' | sudo tee /etc/systemd/journald.conf.d/dmxbox.conf
+sudo systemctl restart systemd-journald
+journalctl --user -u dmxbox --since "-3h"
+```
+
+## 6. Riešenie problémov
 
 ```bash
 dmxbox status

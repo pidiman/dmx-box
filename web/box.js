@@ -3,6 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 let authSt = null;
+let logSt = null, logSum = {};
 let sys = null, wifiScan = null, btFound = null, busy = {}, showPass = false;
 const NAME = () => sys?.system?.hostname || "fajny-dmx-box";
 const SSID = () => sys?.wifi?.hotspot?.ssid || NAME();
@@ -192,6 +193,46 @@ function renderSys() {
     confirmBtn("Vypnúť", "Naozaj vypnúť?", () => act("po", () => api("POST", "/api/system/power", { value: "poweroff" }), "Box sa vypína – po 20 s ho môžeš odpojiť"), "danger")));
 }
 
+// --- záznam prevádzky -------------------------------------------------------------------
+const STYLE_SK = { dnb: "DnB", techno: "Techno", house: "House", hiphop: "Hip-hop", chill: "Chill", party: "Pop / party" };
+const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} kB`);
+function summaryView(x) {
+  if (!x.events) return h("small", {}, "prázdny záznam");
+  const rows = [
+    ["Čas", `${x.from}–${x.to} · hudba ${x.music_min} min${x.bpm_avg ? ` · priemer ${x.bpm_avg} BPM` : ""}`],
+    ["Skladby", `${x.tracks}${x.track_list.length ? ": " + x.track_list.slice(-5).join(", ") + (x.tracks > 5 ? " …" : "") : ""}`],
+    ["Štýly", Object.entries(x.styles_min).map(([k, v]) => `${STYLE_SK[k] || k} ${v} min`).join(" · ") || "–"],
+    ["Dropy", String(x.drops)],
+    ["Ručné zásahy", String(x.actions)],
+    ["Pi", x.cpu_avg != null ? `CPU priemer ${x.cpu_avg} %, max ${x.cpu_max} % · teplota max ${x.temp_max ?? "?"} °C` : "–"],
+    ["Výpadky", x.outages.length ? x.outages.map((o) => `${o.t} ${o.what}`).join(" · ") : "žiadne"],
+  ];
+  if (x.errors) rows.push(["Chyby", `${x.errors} (detaily v súbore)`]);
+  return h("div", { class: "logsum" }, rows.map(([k, v]) => h("div", {}, h("small", {}, k), h("span", {}, v))));
+}
+function renderLog() {
+  const g = $("#g-log"); g.innerHTML = "";
+  if (!logSt) return;
+  if (!logSt.available) { g.append(item(lbl("Záznam prevádzky nebeží", "spusti box ako službu (dmxbox.service)"))); return; }
+  const t = h("input", { type: "checkbox", checked: logSt.enabled, onchange: (e) =>
+    act("lg", async () => { logSt = await api("POST", "/api/log/enabled", { on: e.target.checked }); }, e.target.checked ? "Záznam zapnutý" : "Záznam vypnutý") });
+  g.append(h("label", { class: "item" }, lbl("Zaznamenávať prevádzku",
+    "skladby, rozpoznaný štýl a BPM, dropy, efekty, tvoje zásahy, vyťaženie Pi a výpadky – na vylepšovanie boxu. Posledných 14 dní, max. 20 MB."), t));
+  if (!logSt.files.length) { g.append(item(lbl("Zatiaľ žiadny záznam", "zapíše sa po prvých minútach hrania"))); return; }
+  for (const f of logSt.files.slice(0, 7)) {
+    const open = !!logSum[f.day];
+    g.append(item(lbl(new Date(f.day + "T12:00").toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "numeric" }), kb(f.bytes)),
+      h("button", { onclick: async () => {
+        if (open) { delete logSum[f.day]; render(); return; }
+        try { logSum[f.day] = await api("GET", `/api/log/summary/${f.day}`); render(); } catch (e) { toast(e.message); }
+      } }, open ? "Skryť" : "Súhrn"),
+      h("a", { class: "pill", href: `/api/log/download/${f.day}`, download: `dmxbox-${f.day}.jsonl` }, "Stiahnuť")));
+    if (open) g.append(h("div", { class: "item" }, summaryView(logSum[f.day])));
+  }
+  g.append(item(lbl("Všetky záznamy", "ZIP na poslanie na analýzu"),
+    h("a", { class: "pill", href: "/api/log/download-all", download: "dmxbox-zaznam.zip" }, "Stiahnuť ZIP")));
+}
+
 // --- PIN ochrana ------------------------------------------------------------------------
 function pinInput(ph) {
   return h("input", { type: "password", inputmode: "numeric", pattern: "[0-9]*", maxlength: 8, placeholder: ph, autocomplete: "off" });
@@ -237,10 +278,14 @@ function render() {
   if (!sys) return;
   renderSec();
   document.title = `${NAME()} – nastavenia`;
-  renderWifi(); renderHotspot(); renderBt(); renderAudio(); renderDmx(); renderSys();
+  renderWifi(); renderHotspot(); renderBt(); renderAudio(); renderDmx(); renderLog(); renderSys();
 }
 async function refresh() {
-  try { [sys, authSt] = await Promise.all([api("GET", "/api/system"), api("GET", "/api/auth")]); render(); }
+  try {
+    [sys, authSt, logSt] = await Promise.all([api("GET", "/api/system"), api("GET", "/api/auth"),
+      api("GET", "/api/log").catch(() => null)]);
+    render();
+  }
   catch { toast("Box neodpovedá – skontroluj Wi-Fi", 4000); }
 }
 refresh();

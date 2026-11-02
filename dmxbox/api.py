@@ -10,7 +10,7 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -59,6 +59,39 @@ class MacBody(BaseModel):
 
 class TextBody(BaseModel):
     value: str
+
+
+class ActionLog:
+    """Ručné zásahy z appky (POST/PUT/DELETE na /api) → záznam prevádzky. Čistý ASGI, telo požiadavky nemení."""
+
+    def __init__(self, app, box):
+        self.app, self.box = app, box
+
+    async def __call__(self, scope, receive, send):
+        sl = getattr(self.box, "slog", None)
+        if (sl is None or scope["type"] != "http" or scope["method"] not in ("POST", "PUT", "DELETE")
+                or not scope["path"].startswith("/api/")):
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        status = {"code": 0}
+
+        async def recv():
+            msg = await receive()
+            if msg["type"] == "http.request" and sum(map(len, chunks)) < 20000:
+                chunks.append(msg.get("body", b""))
+            return msg
+
+        async def snd(msg):
+            if msg["type"] == "http.response.start":
+                status["code"] = msg["status"]
+            await send(msg)
+
+        await self.app(scope, recv, snd)
+        try:
+            sl.action(scope["method"], scope["path"], b"".join(chunks), status["code"])
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _cmd(fn, *args):
@@ -181,6 +214,7 @@ def create_app(box) -> FastAPI:
         return resp
 
     sysstats = system.SysStats()
+    box.sysstats = sysstats                     # zdieľané so záznamom prevádzky
 
     def snapshot() -> dict[str, Any]:
         a = box.analyzer.snapshot()
@@ -653,6 +687,47 @@ def create_app(box) -> FastAPI:
         if not isinstance(entries, list):
             raise HTTPException(400, "súbor neobsahuje zoznam svetiel")
         return apply_rig(entries)
+
+    # --- záznam prevádzky ------------------------------------------------------------
+    def slog():
+        sl = getattr(box, "slog", None)
+        if sl is None:
+            raise HTTPException(400, "záznam prevádzky nebeží")
+        return sl
+
+    @app.get("/api/log")
+    def log_state():
+        sl = getattr(box, "slog", None)
+        if sl is None:
+            return {"available": False, "enabled": False, "files": []}
+        return {"available": True, "enabled": sl.enabled, "files": sl.files()}
+
+    @app.post("/api/log/enabled")
+    def log_enabled(body: OnBody):
+        slog().set_enabled(body.on)
+        return log_state()
+
+    @app.get("/api/log/summary/{day}")
+    def log_summary(day: str):
+        res = slog().summary(day)
+        if res is None:
+            raise HTTPException(404, "záznam pre tento deň neexistuje")
+        return res
+
+    @app.get("/api/log/download/{day}")
+    def log_download(day: str):
+        p = slog().path_of(day)
+        if p is None:
+            raise HTTPException(404, "záznam pre tento deň neexistuje")
+        return FileResponse(p, media_type="application/x-ndjson", filename=f"dmxbox-{day}.jsonl")
+
+    @app.get("/api/log/download-all")
+    def log_download_all():
+        data = slog().zip_all()
+        return Response(data, media_type="application/zip",
+                        headers={"content-disposition": 'attachment; filename="dmxbox-zaznam.zip"'})
+
+    app.add_middleware(ActionLog, box=box)
 
     @app.get("/")
     def start():

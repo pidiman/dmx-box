@@ -91,3 +91,8 @@ input[type=text], input[type=password] { font: inherit; color: var(--text); back
   border-radius: 12px; background: #262638; color: var(--text); font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
 #toast.show { opacity: 1; }
 [hidden] { display: none !important; }
+
+/* súhrn záznamu prevádzky */
+.logsum { display: grid; gap: 6px; width: 100%; }
+.logsum div { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; line-height: 1.4; }
+.logsum small { color: #8a8aa3; }

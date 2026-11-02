@@ -24,6 +24,7 @@ from .engine import Engine
 from .fixtures import RigStore
 from .nowplaying import NowPlaying
 from .scenario import ScenarioStore
+from .sessionlog import LogHandler, SessionLog
 from .sim import GENRES, mix_source, synth_source
 from .state import Settings, Store
 
@@ -41,6 +42,8 @@ class Box:
     nowplaying: NowPlaying | None = None
     rig_store: RigStore | None = None
     speaker: SpeakerWatch | None = None
+    slog: SessionLog | None = None
+    sysstats: object | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
@@ -102,6 +105,8 @@ def main() -> None:
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
     box = build(cfg, sim_bpm=args.sim, dry=args.dry, input_device=args.input, genre=args.genre)
+    box.slog = SessionLog(resolve(cfg.get("log_dir", "logs")), box)
+    logging.getLogger("dmxbox").addHandler(LogHandler(box.slog))
     box.out.start()
     box.analyzer.start()
     box.engine.start()
@@ -109,10 +114,13 @@ def main() -> None:
         box.nowplaying.start()
     if box.speaker:
         box.speaker.start()
+    box.slog.start()
     try:
         uvicorn.run(create_app(box), host=cfg["web"]["host"],
                     port=args.port or cfg["web"]["port"], log_level="warning")
     finally:
+        box.slog.stop()
+        box.slog.join(timeout=3)
         box.engine.stop()
         box.analyzer.stop()
         box.out.stop(blackout=True)
