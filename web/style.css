@@ -261,3 +261,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
   .pbar input[type=range] { flex: 1; width: auto; min-width: 60px; }
   .pbar .vol .spk { display: none; }
 }
+
+/* prepínač BT adaptéra v menu */
+.menu-st .bt-ad { display: grid; gap: 6px; padding: 4px 0; }
+.menu-st .bt-ad .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #1d1d2c; border-radius: 10px; padding: 3px; }
+.menu-st .bt-ad .seg button { height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--muted);
+  font: 600 13px system-ui, sans-serif; cursor: pointer; }
+.menu-st .bt-ad .seg button.cur { background: #11331f; color: var(--ok); }
+.menu-st .bt-ad .seg button.next { outline: 1px dashed var(--warn); color: var(--warn); }
+.menu-st .bt-ad .seg button.arm { background: var(--warn); color: #1a1200; }
+.menu-st .bt-ad .seg button:disabled { opacity: .4; cursor: not-allowed; }
+.menu-st .bt-ad-note { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.menu-st .bt-ad-note.warn { color: var(--warn); }

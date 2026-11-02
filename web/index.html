@@ -37,6 +37,14 @@
           <div><small>Box</small><b id="st-conn">offline</b></div>
           <div><small>DMX</small><b id="dmx">DMX</b></div>
           <div id="spk-row" hidden><small>Reproduktor</small><b id="st-spk">–</b></div>
+          <div class="bt-ad" id="bt-ad-row" hidden>
+            <small>Bluetooth adaptér</small>
+            <div class="seg" role="radiogroup" aria-label="Bluetooth adaptér">
+              <button data-mode="builtin" role="radio">Vstavaný</button>
+              <button data-mode="dongle" role="radio">USB dongle</button>
+            </div>
+            <small class="bt-ad-note" id="bt-ad-note"></small>
+          </div>
           <label class="sw-row" id="spk-auto-row" hidden><small title="Po výpadku box reproduktor sám znova pripojí">Auto pripojenie</small>
             <input type="checkbox" id="spk-auto" role="switch"><span class="sw" aria-hidden="true"></span></label>
           <label class="sw-row" id="air-keep-row" hidden><small title="AirPlay hrá do stabilného virtuálneho výstupu – výpadok reproduktora ho nezastaví">AirPlay hrá pri výpadku</small>

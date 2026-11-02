@@ -940,3 +940,27 @@ def test_player(tmp_path):
     r = c.post("/api/player/toggle").json()
     assert r["fallback"] == "mute" and fa.muted
     assert c.post("/api/player/volume", json={"step": -5}).status_code == 200
+
+
+def test_bt_adapter_status(tmp_path):
+    from dmxbox.system import bt_adapter_status
+    sysfs = tmp_path / "sys"
+    uart = sysfs / "devices/platform/soc/serial0/serial0-0/bluetooth/hci0"
+    usb = sysfs / "devices/platform/soc/usb/usb1/1-1/1-1.3/1-1.3:1.0/bluetooth/hci0"
+    cls = sysfs / "class/bluetooth"; cls.mkdir(parents=True)
+    usbdev = sysfs / "bus/usb/devices/1-1.3"; usbdev.mkdir(parents=True)
+    (usbdev / "bDeviceClass").write_text("e0\n")
+    cfg = tmp_path / "config.txt"; bl = tmp_path / "dmxbox-bt.conf"
+    # dongle aktívny, vstavaný vypnutý
+    usb.mkdir(parents=True); (cls / "hci0").mkdir(); (cls / "hci0" / "device").symlink_to(usb.parent.parent)
+    cfg.write_text("[all]\ndtoverlay=disable-bt\n")
+    st = bt_adapter_status(sysfs, cfg, bl)
+    assert st["current"] == "dongle" and st["configured"] == "dongle" and st["dongle_present"] and not st["pending"]
+    # nastavené na vstavaný, ešte bez reštartu → pending
+    cfg.write_text("[all]\n#dtoverlay=disable-bt\n"); bl.write_text("blacklist btusb\n")
+    st = bt_adapter_status(sysfs, cfg, bl)
+    assert st["configured"] == "builtin" and st["pending"]
+    # po reštarte: beží vstavaný (UART)
+    (cls / "hci0" / "device").unlink(); uart.mkdir(parents=True); (cls / "hci0" / "device").symlink_to(uart.parent.parent)
+    st = bt_adapter_status(sysfs, cfg, bl)
+    assert st["current"] == "builtin" and not st["pending"]

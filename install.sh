@@ -120,12 +120,15 @@ say "Ovládanie systému z webu (Wi-Fi, hotspot, reštart) bez hesla"
 # čítanie správ jadra bez sudo (strážca BT reproduktora rozpozná zamrznuté spojenie)
 sudo usermod -aG systemd-journal "$USER" || true
 
+sudo install -m 755 "$REPO/scripts/dmxbox-btmode" /usr/local/sbin/dmxbox-btmode   # prepínanie BT adaptéra z appky
+
 SUDOERS=/etc/sudoers.d/dmxbox
 sudo tee "$SUDOERS" >/dev/null <<EOF
 # DMX-BOX web: len tieto príkazy bez hesla (install.sh)
 $USER ALL=(root) NOPASSWD: /usr/bin/nmcli, /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff, \\
   /usr/bin/systemctl enable --now wifi-fallback, /usr/bin/systemctl disable --now wifi-fallback, \\
-  /usr/bin/install -m 755 $REPO/scripts/dmxbox /usr/local/bin/dmxbox
+  /usr/bin/install -m 755 $REPO/scripts/dmxbox /usr/local/bin/dmxbox, \\
+  /usr/local/sbin/dmxbox-btmode
 EOF
 sudo chmod 440 "$SUDOERS"
 sudo visudo -cf "$SUDOERS" >/dev/null || { echo "Chyba v $SUDOERS, mažem"; sudo rm -f "$SUDOERS"; }

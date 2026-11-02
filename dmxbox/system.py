@@ -438,6 +438,57 @@ def restart_app() -> None:
     later(1.0, "systemctl", "--user", "restart", "dmxbox")
 
 
+# --- Bluetooth adaptér: vstavaný alebo USB dongle -----------------------------------------------
+
+BTMODE = "/usr/local/sbin/dmxbox-btmode"
+
+
+def _boot_cfg() -> Path:
+    p = Path("/boot/firmware/config.txt")
+    return p if p.exists() else Path("/boot/config.txt")
+
+
+def bt_adapter_status(sysfs: Path = Path("/sys"), boot_cfg: Path | None = None,
+                      blacklist: Path = Path("/etc/modprobe.d/dmxbox-bt.conf")) -> dict:
+    """Ktorý adaptér práve beží (podľa /sys) a ktorý je nastavený na ďalší štart."""
+    current = None
+    for hci in sorted((sysfs / "class" / "bluetooth").glob("hci*")):
+        try:
+            dev = str((hci / "device").resolve())
+        except OSError:
+            continue
+        current = "dongle" if "/usb" in dev else "builtin"
+        break
+    dongle_present = False
+    for d in (sysfs / "bus" / "usb" / "devices").glob("*"):
+        try:
+            if (d / "bDeviceClass").read_text().strip() == "e0" or any(
+                    (i / "bInterfaceClass").read_text().strip() == "e0" for i in d.glob("*:*")):
+                dongle_present = True
+                break
+        except OSError:
+            continue
+    cfg = boot_cfg or _boot_cfg()
+    try:
+        builtin_off = any(l.strip() == "dtoverlay=disable-bt" for l in cfg.read_text().splitlines())
+    except OSError:
+        builtin_off = current == "dongle"
+    configured = "dongle" if builtin_off else ("builtin" if blacklist.exists() or not dongle_present else "both")
+    return {"current": current, "configured": configured, "dongle_present": dongle_present,
+            "helper": Path(BTMODE).exists(), "pending": configured in ("builtin", "dongle") and configured != current}
+
+
+def bt_adapter_set(mode: str) -> None:
+    if mode not in ("builtin", "dongle"):
+        raise CmdError("neznámy adaptér")
+    if not Path(BTMODE).exists():
+        raise CmdError("chýba pomocný skript – na Pi spusti: sudo install -m 755 ~/dmx-box/scripts/dmxbox-btmode /usr/local/sbin/")
+    if mode == "dongle" and not bt_adapter_status()["dongle_present"]:
+        raise CmdError("USB Bluetooth dongle nie je zapojený")
+    run(BTMODE, mode, sudo=True, timeout=20)
+    later(2.0, "systemctl", "reboot", sudo=True)
+
+
 def power(action: str) -> None:
     if action not in ("reboot", "poweroff"):
         raise CmdError("neznáma akcia")

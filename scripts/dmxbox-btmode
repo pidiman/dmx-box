@@ -1,0 +1,32 @@
+#!/bin/bash
+# DMX-BOX: prepnutie Bluetooth adaptéra – vstavaný (UART) alebo USB dongle.
+# Spúšťa ho appka cez sudo (bez hesla, /etc/sudoers.d/dmxbox). Zmena platí po reštarte.
+#   dmxbox-btmode builtin   vstavaný BT zapnutý, USB dongle ignorovaný (blacklist btusb)
+#   dmxbox-btmode dongle    vstavaný BT vypnutý (dtoverlay=disable-bt), USB dongle aktívny
+set -euo pipefail
+
+CFG=/boot/firmware/config.txt
+[[ -f $CFG ]] || CFG=/boot/config.txt
+BLACKLIST=/etc/modprobe.d/dmxbox-bt.conf
+
+case "${1:-}" in
+  builtin)
+    sed -i 's/^dtoverlay=disable-bt/#dtoverlay=disable-bt/' "$CFG"
+    systemctl enable hciuart >/dev/null 2>&1 || true
+    echo "blacklist btusb   # DMX-BOX: aktívny je vstavaný Bluetooth" > "$BLACKLIST"
+    ;;
+  dongle)
+    if grep -qE '^#?dtoverlay=disable-bt' "$CFG"; then
+      sed -i 's/^#dtoverlay=disable-bt/dtoverlay=disable-bt/' "$CFG"
+    else
+      printf '\n[all]\ndtoverlay=disable-bt\n' >> "$CFG"
+    fi
+    systemctl disable hciuart >/dev/null 2>&1 || true
+    rm -f "$BLACKLIST"
+    ;;
+  *)
+    echo "použitie: $0 builtin|dongle" >&2
+    exit 2
+    ;;
+esac
+echo "ok: $1 (platí po reštarte)"

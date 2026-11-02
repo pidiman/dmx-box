@@ -183,6 +183,7 @@ function live(d) {
   speakerState(d.speaker);
   airKeepState(d.airkeep);
   playerState(d.player, d.track);
+  btAdapterState(d.bt_adapter);
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
@@ -383,6 +384,49 @@ $("#pb-vol").addEventListener("change", (e) => { pbHold = Date.now() + 2500; pbP
   const setH = () => document.documentElement.style.setProperty("--top-h", `${top.offsetHeight}px`);
   setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top);
 }
+
+// --- Bluetooth adaptér: vstavaný / USB dongle (zmena = reštart boxu) ---------------------------
+const BT_NAMES = { builtin: "vstavaný", dongle: "USB dongle" };
+let btArm = null, btArmT = null, btLast = null;
+function btAdapterState(a) {
+  const row = $("#bt-ad-row");
+  row.hidden = !a || (!a.current && !a.dongle_present);
+  if (row.hidden) return;
+  btLast = a;
+  row.querySelectorAll(".seg button").forEach((b) => {
+    const m = b.dataset.mode;
+    b.classList.toggle("cur", a.current === m);
+    b.classList.toggle("next", !!a.pending && a.configured === m);
+    b.classList.toggle("arm", btArm === m);
+    b.disabled = m === "dongle" && !a.dongle_present && a.current !== "dongle";
+    b.setAttribute("aria-checked", String(a.current === m));
+    b.textContent = btArm === m ? "Reštartovať?" : (m === "builtin" ? "Vstavaný" : "USB dongle");
+  });
+  const note = $("#bt-ad-note");
+  if (a.pending) { note.textContent = `Po reštarte bude aktívny ${BT_NAMES[a.configured]}.`; note.className = "bt-ad-note warn"; }
+  else if (btArm) { note.textContent = "Box sa reštartuje (~1 min). Reproduktor potom spáruj znova."; note.className = "bt-ad-note warn"; }
+  else if (!a.helper) { note.textContent = "Prepínanie nie je nainštalované (dmxbox-btmode)."; note.className = "bt-ad-note warn"; }
+  else { note.textContent = a.dongle_present ? "" : "USB dongle nie je zapojený."; note.className = "bt-ad-note"; }
+}
+$("#bt-ad-row").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-mode]");
+  if (!b || b.disabled || !btLast) return;
+  const m = b.dataset.mode;
+  if (btLast.current === m && !btLast.pending) return;
+  if (btArm !== m) {                        // prvé ťuknutie: potvrdenie
+    btArm = m; clearTimeout(btArmT);
+    btArmT = setTimeout(() => { btArm = null; btAdapterState(btLast); }, 4000);
+    btAdapterState(btLast); return;
+  }
+  btArm = null; clearTimeout(btArmT);
+  try {
+    const r = await fetch("/api/system/bt/adapter", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: m }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || r.statusText);
+    toast(`Prepínam na ${BT_NAMES[m]} – box sa reštartuje (~1 min). Potom spáruj reproduktor znova.`, 7000);
+  } catch (e) { toast("Nepodarilo sa: " + e.message, 6000); btAdapterState(btLast); }
+});
 
 // --- AirPlay pri výpadku reproduktora --------------------------------------------------------
 let airBusy = false;

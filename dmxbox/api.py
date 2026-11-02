@@ -221,6 +221,17 @@ def create_app(box) -> FastAPI:
         resp.delete_cookie(COOKIE)
         return resp
 
+    _bta = {"t": 0.0, "v": None}
+
+    def bt_adapter_cached():
+        if time.monotonic() - _bta["t"] > 10:
+            _bta["t"] = time.monotonic()
+            try:
+                _bta["v"] = system.bt_adapter_status()
+            except Exception:  # noqa: BLE001
+                _bta["v"] = None
+        return _bta["v"]
+
     sysstats = system.SysStats()
     box.sysstats = sysstats                     # zdieľané so záznamom prevádzky
 
@@ -250,6 +261,7 @@ def create_app(box) -> FastAPI:
             "speaker": box.speaker.info() if getattr(box, "speaker", None) else None,
             "airkeep": box.airkeep.info() if getattr(box, "airkeep", None) else None,
             "player": box.player.info() if getattr(box, "player", None) else None,
+            "bt_adapter": bt_adapter_cached(),
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},
@@ -457,6 +469,14 @@ def create_app(box) -> FastAPI:
         if getattr(box, "speaker", None):
             box.speaker.forget(body.mac)
         return _cmd(system.bt_forget, body.mac)
+
+    @app.get("/api/system/bt/adapter")
+    def bt_adapter():
+        return system.bt_adapter_status()
+
+    @app.post("/api/system/bt/adapter")
+    def bt_adapter_set(body: TextBody):
+        return _cmd(system.bt_adapter_set, body.value)
 
     @app.post("/api/system/bt/autoreconnect")
     def bt_autoreconnect(body: OnBody):
