@@ -143,6 +143,8 @@ class SpeakerWatch(threading.Thread):
             for _ in range(8):
                 sink = self._sink_of(mac)
                 if sink:
+                    if self._default_sink() == sink:   # PipeWire už prepol sám – ďalšie prepnutie = výpadok zvuku
+                        break
                     try:
                         self.sys.audio_output(sink)
                     except self.sys.CmdError as e:

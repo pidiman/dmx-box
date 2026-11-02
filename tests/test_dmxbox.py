@@ -830,7 +830,9 @@ def test_audio_output_skips_airplay_buffer(monkeypatch):
         if cmd[:4] == ("pactl", "list", "short", "sinks"):
             return "56\talsa_output.jack\tPipeWire\n99\tdmxbox_airplay\tPipeWire"
         if cmd[:4] == ("pactl", "list", "short", "sink-inputs"):
-            return "71\t99\t12\tPipeWire\n72\t87\t13\tPipeWire"     # 71 = AirPlay vo virtuálnom výstupe
+            return ("71\t99\t12\tPipeWire\n72\t87\t13\tPipeWire\n"      # 71 = AirPlay vo virtuálnom výstupe
+                    "73\t56\t14\tPipeWire")                               # 73 už hrá do cieľa
+
         return ""
     monkeypatch.setattr(system, "run", fake_run)
     monkeypatch.setattr(system, "audio_status", lambda: {"sinks": [{"name": "alsa_output.jack"}]})

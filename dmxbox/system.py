@@ -339,11 +339,12 @@ def audio_output(sink: str) -> None:
     run("pactl", "set-default-sink", sink)
     # presunúť aj práve hrajúce streamy – okrem tých vo virtuálnom výstupe AirPlay (ten má ostať stabilný)
     try:
-        virtual = {ln.split("\t")[0] for ln in run("pactl", "list", "short", "sinks").splitlines()
-                   if "\tdmxbox_" in ln}
+        short = [ln.split("\t") for ln in run("pactl", "list", "short", "sinks").splitlines()]
+        virtual = {p[0] for p in short if len(p) > 1 and p[1].startswith("dmxbox_")}
+        target = {p[0] for p in short if len(p) > 1 and p[1] == sink}
         for line in run("pactl", "list", "short", "sink-inputs").splitlines():
             p = line.split("\t")
-            if len(p) > 1 and p[1] in virtual:
+            if len(p) > 1 and (p[1] in virtual or p[1] in target):   # AirPlay buffer / už je tam
                 continue
             run("pactl", "move-sink-input", p[0], sink)
     except CmdError:
