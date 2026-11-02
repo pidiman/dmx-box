@@ -244,7 +244,7 @@ def bt_power_on() -> None:
     run("bluetoothctl", "power", "on", timeout=10)
 
 
-def bt_scan(seconds: int = 20) -> list[dict]:
+def bt_scan(seconds: int = 10) -> list[dict]:
     bt_power_on()
     paired = {mac for mac, _ in _bt_devices("Paired")}
     try:

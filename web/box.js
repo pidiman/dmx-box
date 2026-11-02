@@ -128,7 +128,7 @@ function renderBt() {
     try { btFound = (await api("GET", "/api/system/bt/scan")).result; if (!btFound.length) toast("Nič som nenašiel – je zariadenie v režime párovania?"); }
     catch (e) { toast("Chyba: " + e.message); }
     busy.bs = false; render();
-  } }, busy.bs ? spin("Hľadám 20 s…") : "+ Pridať Bluetooth reproduktor");
+  } }, busy.bs ? spin("Hľadám 10 s…") : "+ Pridať Bluetooth reproduktor");
   g.append(h("div", { class: "item" }, scan));
   for (const d of btFound || []) {
     const pairing = busy.bp === d.mac;
