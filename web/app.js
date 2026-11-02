@@ -181,6 +181,7 @@ function live(d) {
   }
   sysStats(d.sys);
   speakerState(d.speaker);
+  airKeepState(d.airkeep);
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
@@ -326,6 +327,25 @@ $("#spk-auto").addEventListener("change", async (ev) => {
     toast(ev.target.checked ? "Auto pripojenie reproduktora zapnuté" : "Auto pripojenie vypnuté");
   } catch { ev.target.checked = !ev.target.checked; toast("Nepodarilo sa uložiť"); }
   spkBusy = false;
+});
+
+// --- AirPlay pri výpadku reproduktora --------------------------------------------------------
+let airBusy = false;
+function airKeepState(k) {
+  const row = $("#air-keep-row");
+  row.hidden = !(k && k.available);
+  if (!row.hidden && !airBusy) $("#air-keep").checked = !!k.keep;
+  if (k && k.error) row.title = k.error; else row.removeAttribute("title");
+}
+$("#air-keep").addEventListener("change", async (ev) => {
+  airBusy = true;
+  try {
+    const r = await fetch("/api/system/airplay/keep", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ on: ev.target.checked }) });
+    if (!r.ok) throw new Error();
+    toast(ev.target.checked ? "AirPlay pri výpadku hrá ďalej (AirPlay sa reštartoval)" : "AirPlay hrá priamo do výstupu");
+  } catch { ev.target.checked = !ev.target.checked; toast("Nepodarilo sa uložiť"); }
+  airBusy = false;
 });
 
 function setOnline(on) {

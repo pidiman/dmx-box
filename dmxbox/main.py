@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 import uvicorn
 
+from .airplay_keep import AirplayKeep
 from .api import create_app
 from .auth import Auth
 from .audio import Analyzer, device_source, list_inputs, parec_source
@@ -42,6 +43,7 @@ class Box:
     nowplaying: NowPlaying | None = None
     rig_store: RigStore | None = None
     speaker: SpeakerWatch | None = None
+    airkeep: AirplayKeep | None = None
     slog: SessionLog | None = None
     sysstats: object | None = None
 
@@ -80,7 +82,8 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     return Box(store, analyzer, engine, out, LineIn(), sources,
                ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
                Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying(), rig_store,
-               SpeakerWatch(resolve(cfg.get("speaker_file", "speaker.json"))))
+               SpeakerWatch(resolve(cfg.get("speaker_file", "speaker.json"))),
+               AirplayKeep(resolve(cfg.get("airplay_file", "airplay.json"))))
 
 
 def main() -> None:
@@ -114,6 +117,8 @@ def main() -> None:
         box.nowplaying.start()
     if box.speaker:
         box.speaker.start()
+    if box.airkeep:
+        box.airkeep.start()
     box.slog.start()
     try:
         uvicorn.run(create_app(box), host=cfg["web"]["host"],

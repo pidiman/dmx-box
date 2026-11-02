@@ -240,6 +240,7 @@ def create_app(box) -> FastAPI:
             "track": box.nowplaying.track.as_dict() if getattr(box, "nowplaying", None) else None,
             "sys": sysstats.get(),
             "speaker": box.speaker.info() if getattr(box, "speaker", None) else None,
+            "airkeep": box.airkeep.info() if getattr(box, "airkeep", None) else None,
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},
@@ -472,6 +473,12 @@ def create_app(box) -> FastAPI:
     @app.post("/api/system/airplay")
     def airplay(body: OnBody):
         return _cmd(system.airplay_set, body.on)
+
+    @app.post("/api/system/airplay/keep")
+    def airplay_keep(body: OnBody):
+        if not getattr(box, "airkeep", None):
+            raise HTTPException(400, "AirPlay nie je dostupný")
+        return {"ok": True, "result": box.airkeep.set_keep(body.on)}
 
     @app.post("/api/system/spotify")
     def spotify(body: OnBody):

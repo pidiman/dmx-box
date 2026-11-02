@@ -748,3 +748,92 @@ def test_session_log_prune(tmp_path):
     sl.event("start"); sl.flush()
     files = sorted(p.name for p in d.glob("*.jsonl"))
     assert len(files) <= 14 and sum((d / f).stat().st_size for f in files) <= 0.01 * 1024 * 1024 + 2000
+
+
+class _FakePW:
+    """Simulovaný pactl/systemctl pre AirplayKeep."""
+    from dmxbox.system import CmdError
+
+    def __init__(self):
+        self.sinks = {"bluez_output.F4.1": "87", "alsa_output.jack": "56"}
+        self.modules = {}
+        self.default = "bluez_output.F4.1"
+        self.calls = []
+
+    def has(self, _):
+        return True
+
+    def run(self, *cmd, timeout=15, sudo=False):
+        self.calls.append(cmd)
+        if cmd[:4] == ("pactl", "list", "short", "sinks"):
+            return "\n".join(f"{i}\t{n}\tPipeWire" for n, i in self.sinks.items())
+        if cmd[:4] == ("pactl", "list", "short", "modules"):
+            return "\n".join(f"{i}\t{n}\t{a}" for i, (n, a) in self.modules.items())
+        if cmd[:2] == ("pactl", "load-module"):
+            mid = str(500 + len(self.modules))
+            self.modules[mid] = (cmd[2], " ".join(cmd[3:]))
+            if cmd[2] == "module-null-sink":
+                self.sinks["dmxbox_airplay"] = "99"
+            return mid
+        if cmd[:2] == ("pactl", "unload-module"):
+            n, _ = self.modules.pop(cmd[2])
+            if n == "module-null-sink":
+                self.sinks.pop("dmxbox_airplay", None)
+            return ""
+        if cmd[:2] == ("pactl", "get-default-sink"):
+            return self.default
+        if cmd[:2] == ("pactl", "set-default-sink"):
+            self.default = cmd[2]
+            return ""
+        if cmd[:3] == ("systemctl", "--user", "is-active"):
+            return "active"
+        return ""
+
+    def audio_status(self):
+        kind = lambda n: "bluetooth" if n.startswith("bluez") else "jack" if "alsa" in n else "other"
+        return {"sinks": [{"name": n, "kind": kind(n)} for n in self.sinks if not n.startswith("dmxbox_")]}
+
+
+def test_airplay_keep(tmp_path):
+    from dmxbox.airplay_keep import AirplayKeep, SINK
+    pw = _FakePW()
+    dropin = tmp_path / "airplay.service.d" / "dmxbox-keep.conf"
+    k = AirplayKeep(tmp_path / "airplay.json", sysmod=pw, dropin=dropin)
+    assert k.keep is True                                   # predvolene zapnuté
+    k.apply()
+    assert SINK in pw.sinks and k.info()["active"]
+    assert "PULSE_SINK=dmxbox_airplay" in dropin.read_text()
+    assert ("systemctl", "--user", "restart", "airplay") in pw.calls
+    # druhý beh: nič nové nevytvára, AirPlay nereštartuje
+    pw.calls.clear(); k.apply()
+    assert not any(c[:2] == ("pactl", "load-module") for c in pw.calls)
+    assert ("systemctl", "--user", "restart", "airplay") not in pw.calls
+    # virtuálny výstup sa omylom stal predvoleným → strážca vráti skutočný (BT má prednosť)
+    pw.default = SINK; k.apply()
+    assert pw.default == "bluez_output.F4.1"
+    # po reštarte PipeWire zmizne → znova sa vytvorí
+    pw.sinks.pop(SINK); pw.modules.clear(); k.apply()
+    assert SINK in pw.sinks
+    # vypnutie: moduly preč, drop-in preč, AirPlay reštart; nastavenie prežije
+    pw.calls.clear(); k.set_keep(False)
+    assert SINK not in pw.sinks and not dropin.exists()
+    assert ("systemctl", "--user", "restart", "airplay") in pw.calls
+    assert AirplayKeep(tmp_path / "airplay.json", sysmod=pw, dropin=dropin).keep is False
+
+
+def test_audio_output_skips_airplay_buffer(monkeypatch):
+    from dmxbox import system
+    calls = []
+
+    def fake_run(*cmd, **kw):
+        calls.append(cmd)
+        if cmd[:4] == ("pactl", "list", "short", "sinks"):
+            return "56\talsa_output.jack\tPipeWire\n99\tdmxbox_airplay\tPipeWire"
+        if cmd[:4] == ("pactl", "list", "short", "sink-inputs"):
+            return "71\t99\t12\tPipeWire\n72\t87\t13\tPipeWire"     # 71 = AirPlay vo virtuálnom výstupe
+        return ""
+    monkeypatch.setattr(system, "run", fake_run)
+    monkeypatch.setattr(system, "audio_status", lambda: {"sinks": [{"name": "alsa_output.jack"}]})
+    system.audio_output("alsa_output.jack")
+    moved = [c[2] for c in calls if c[:2] == ("pactl", "move-sink-input")]
+    assert moved == ["72"]

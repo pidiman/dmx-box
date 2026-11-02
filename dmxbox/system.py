@@ -311,7 +311,7 @@ def audio_status() -> dict:
             elif s.startswith("Description:") and name:
                 desc = s.split(":", 1)[1].strip()
                 kind = _sink_kind(name)
-                if name == "auto_null":      # „Dummy Output“: PipeWire nenašiel žiadny skutočný výstup
+                if name == "auto_null" or name.startswith("dmxbox_"):   # Dummy Output / virtuálny výstup AirPlay
                     name = None
                     continue
                 if "null" in name.lower():
@@ -337,10 +337,15 @@ def audio_output(sink: str) -> None:
     if sink not in names:
         raise CmdError("výstup nenájdený")
     run("pactl", "set-default-sink", sink)
-    # presunúť aj práve hrajúce streamy
+    # presunúť aj práve hrajúce streamy – okrem tých vo virtuálnom výstupe AirPlay (ten má ostať stabilný)
     try:
+        virtual = {ln.split("\t")[0] for ln in run("pactl", "list", "short", "sinks").splitlines()
+                   if "\tdmxbox_" in ln}
         for line in run("pactl", "list", "short", "sink-inputs").splitlines():
-            run("pactl", "move-sink-input", line.split("\t")[0], sink)
+            p = line.split("\t")
+            if len(p) > 1 and p[1] in virtual:
+                continue
+            run("pactl", "move-sink-input", p[0], sink)
     except CmdError:
         pass
 
