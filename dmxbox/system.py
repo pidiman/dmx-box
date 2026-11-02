@@ -235,19 +235,39 @@ def bt_disconnect(mac: str) -> None:
     run("bluetoothctl", "disconnect", _mac(mac))
 
 
-def bt_scan(seconds: int = 12) -> list[dict]:
+def bt_power_on() -> None:
+    """Nový adaptér (USB dongle) býva po štarte vypnutý – bez toho scan nič nenájde."""
+    try:
+        run("rfkill", "unblock", "bluetooth", sudo=True, timeout=5)
+    except CmdError:
+        pass
+    run("bluetoothctl", "power", "on", timeout=10)
+
+
+def bt_scan(seconds: int = 20) -> list[dict]:
+    bt_power_on()
     paired = {mac for mac, _ in _bt_devices("Paired")}
     try:
         run("bluetoothctl", "--timeout", str(seconds), "scan", "on", timeout=seconds + 10)
     except CmdError:
         pass   # timeout scanu vracia niekedy nenulový kód
-    return [{"mac": mac, "name": name} for mac, name in _bt_devices("")
-            if mac not in paired and name.replace("-", ":") != mac]
+    found = []
+    for mac, name in _bt_devices(""):
+        if mac in paired:
+            continue
+        unnamed = name.replace("-", ":") == mac
+        icon = _bt_icon(mac)
+        found.append({"mac": mac, "name": f"Bez mena ({mac})" if unnamed else name,
+                      "speaker": icon.startswith("audio"), "unnamed": unnamed})
+    # reproduktory hore, bezmenné (často iné telefóny/BLE) dole
+    found.sort(key=lambda d: (not d["speaker"], d["unnamed"], d["name"].lower()))
+    return found
 
 
 def bt_connect(mac: str) -> None:
     """Spárovať a pripojiť zariadenie (BT reproduktor)."""
     _mac(mac)
+    bt_power_on()
     for step in (("pair", 30), ("trust", 10), ("connect", 30)):
         try:
             run("bluetoothctl", "--timeout", str(step[1]), step[0], mac, timeout=step[1] + 10)

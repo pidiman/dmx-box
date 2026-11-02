@@ -179,7 +179,7 @@ function stepSpeaker(n) {
       try { found = (await api("GET", "/api/system/bt/scan")).result; if (!found.length) toast("Nič som nenašiel – je reproduktor v režime párovania?"); }
       catch (e) { toast("Chyba: " + e.message); }
       scanning = false; renderSteps(true);
-    } }, scanning ? h("span", {}, h("span", { class: "spin" }), " Hľadám (12 s)…") : "Hľadať reproduktory"));
+    } }, scanning ? h("span", {}, h("span", { class: "spin" }), " Hľadám (20 s)…") : "Hľadať reproduktory"));
 }
 
 function stepSource(n) {

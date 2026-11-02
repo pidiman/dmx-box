@@ -40,7 +40,7 @@ Ak niečo nevyjde (napr. chýba zvuková karta), box scenár aj tak spustí a uk
 | --- | --- |
 | **Sieť** | aktuálna Wi-Fi a IP; uložené siete (**Pripojiť**, **Zmazať**); **Pridať Wi-Fi sieť** – „Nájsť siete v okolí“ alebo meno ručne + heslo. Sieť sa dá uložiť aj vopred. |
 | **Hotspot** | zapnúť / vypnúť, ukázať a zmeniť heslo, „Zapnúť sám bez Wi-Fi“ |
-| **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 12 s) |
+| **Bluetooth** | viditeľnosť pre nové mobily; spárované zariadenia (**Odpojiť**, **Zabudnúť**, reproduktor **Pripojiť**); **+ Pridať Bluetooth reproduktor** (hľadá 20 s; reproduktory sú hore) |
 | **Zvuk** | kam ide zvuk (jack, UCA202, BT reproduktor, HDMI) – **Použiť**; hlasitosť; AirPlay zap/vyp; Spotify Connect zap/vyp |
 | **Svetlá** | stav DMX donglu, zoznam svetiel, náhľad (virtuálne svetlá), **Spravovať svetlá** (nižšie) |
 | **Zabezpečenie (PIN)** | **Nastaviť PIN** (4–8 číslic); **Zapnúť / Vypnúť vyžadovanie PINu** (potvrdzuje sa PINom); **Zmeniť PIN** (súčasný + nový); **Zamknúť toto zariadenie** |
