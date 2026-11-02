@@ -17,6 +17,7 @@ from .api import create_app
 from .auth import Auth
 from .audio import Analyzer, device_source, list_inputs, parec_source
 from .audio_ctl import LineIn
+from .btspeaker import SpeakerWatch
 from .config import load_config, resolve
 from .dmx_out import DMXOut
 from .engine import Engine
@@ -39,6 +40,7 @@ class Box:
     auth: Auth | None = None
     nowplaying: NowPlaying | None = None
     rig_store: RigStore | None = None
+    speaker: SpeakerWatch | None = None
 
 
 def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
@@ -74,7 +76,8 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
     engine = Engine(rig, analyzer, store, out, fps=dc["fps"])
     return Box(store, analyzer, engine, out, LineIn(), sources,
                ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
-               Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying(), rig_store)
+               Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying(), rig_store,
+               SpeakerWatch(resolve(cfg.get("speaker_file", "speaker.json"))))
 
 
 def main() -> None:
@@ -104,6 +107,8 @@ def main() -> None:
     box.engine.start()
     if box.nowplaying:
         box.nowplaying.start()
+    if box.speaker:
+        box.speaker.start()
     try:
         uvicorn.run(create_app(box), host=cfg["web"]["host"],
                     port=args.port or cfg["web"]["port"], log_level="warning")

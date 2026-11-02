@@ -205,6 +205,7 @@ def create_app(box) -> FastAPI:
             "viz": {"l": [int(x * 99) for x in a.viz_l], "r": [int(x * 99) for x in a.viz_r]},   # 0–99, menšie správy
             "track": box.nowplaying.track.as_dict() if getattr(box, "nowplaying", None) else None,
             "sys": sysstats.get(),
+            "speaker": box.speaker.info() if getattr(box, "speaker", None) else None,
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},
@@ -396,15 +397,28 @@ def create_app(box) -> FastAPI:
 
     @app.post("/api/system/bt/connect")
     def bt_connect(body: MacBody):
-        return _cmd(system.bt_connect, body.mac)
+        res = _cmd(system.bt_connect, body.mac)
+        if getattr(box, "speaker", None):
+            box.speaker.manual_connect(body.mac)
+        return res
 
     @app.post("/api/system/bt/disconnect")
     def bt_disconnect(body: MacBody):
+        if getattr(box, "speaker", None):       # ručné odpojenie = nenaťahovať späť
+            box.speaker.manual_disconnect(body.mac)
         return _cmd(system.bt_disconnect, body.mac)
 
     @app.post("/api/system/bt/forget")
     def bt_forget(body: MacBody):
+        if getattr(box, "speaker", None):
+            box.speaker.forget(body.mac)
         return _cmd(system.bt_forget, body.mac)
+
+    @app.post("/api/system/bt/autoreconnect")
+    def bt_autoreconnect(body: OnBody):
+        if not getattr(box, "speaker", None):
+            raise HTTPException(400, "Bluetooth nie je dostupný")
+        return {"ok": True, "result": box.speaker.set_auto(body.on)}
 
     @app.post("/api/system/audio/output")
     def audio_output(body: TextBody):

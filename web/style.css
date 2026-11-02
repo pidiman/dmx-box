@@ -140,7 +140,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .hamb { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 10px;
   background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; }
 .hamb[aria-expanded="true"] { border-color: var(--accent2); }
-.menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px; z-index: 20;
+.menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 270px; max-width: calc(100vw - 24px); z-index: 20;
   background: #12121c; border: 1px solid var(--line); border-radius: 12px; padding: 6px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, .55); }
 .menu[hidden] { display: none; }
@@ -214,3 +214,16 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .fxl p { grid-column: 2; margin: 0; font-size: 13px; color: #c7c7d6; line-height: 1.4; }
 .fxl .when { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .fxl .when span { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #1d1d2c; color: var(--muted); }
+
+/* BT reproduktor v menu */
+.menu-st [hidden] { display: none !important; }
+.menu-st b.warn { background: #33270a; color: var(--warn); }
+.menu-st b { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; padding: 2px 0; }
+.sw-row input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sw-row .sw { position: relative; width: 40px; height: 24px; flex: none; border-radius: 999px; background: #2a2a3c; transition: background .2s; }
+.sw-row .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #ececf4; transition: transform .2s; }
+.sw-row input:checked + .sw { background: var(--ok); }
+.sw-row input:checked + .sw::after { transform: translateX(16px); }
+.sw-row input:focus-visible + .sw { outline: 2px solid var(--accent2); outline-offset: 2px; }

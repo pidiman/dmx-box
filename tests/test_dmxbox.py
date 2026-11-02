@@ -630,3 +630,68 @@ def test_sys_stats(tmp_path):
     assert s.get()["cpu"] == 50
     missing = SysStats(ttl=0, proc=tmp_path / "nie", thermal=tmp_path / "nie", disk="/nie/je")
     assert missing.get() is None
+
+
+class _FakeBT:
+    """Simulovaný bluetoothctl/pactl pre SpeakerWatch."""
+    from dmxbox.system import CmdError
+
+    def __init__(self):
+        self.connected = {"AA:BB:CC:DD:EE:FF": "JBL Charge 3"}
+        self.sink = "bluez_output.AA_BB_CC_DD_EE_FF.1"
+        self.calls = []
+        self.fail = False
+
+    def has(self, _):
+        return True
+
+    def _bt_devices(self, kind):
+        return list(self.connected.items())
+
+    def _bt_icon(self, mac):
+        return "audio-card"
+
+    def run(self, *cmd, timeout=15, sudo=False):
+        self.calls.append(cmd)
+        if cmd[:2] == ("pactl", "get-default-sink"):
+            return self.sink
+        if "connect" in cmd:
+            if self.fail:
+                raise self.CmdError("Failed to connect")
+            self.connected[cmd[-1]] = "JBL Charge 3"
+        return ""
+
+    def audio_status(self):
+        return {"sinks": [{"name": "bluez_output.AA_BB_CC_DD_EE_FF.1"}, {"name": "alsa_output.jack"}]}
+
+    def audio_output(self, sink):
+        self.sink = sink
+
+
+def test_bt_speaker_autoreconnect(tmp_path):
+    from dmxbox.btspeaker import SpeakerWatch
+    fake = _FakeBT()
+    w = SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w.tick()
+    assert w.info()["connected"] and w.info()["name"] == "JBL Charge 3" and w.state["want_output"]
+    # výpadok: zvuk spadne na jack, strážca reproduktor pripojí a vráti naň zvuk
+    fake.connected.clear(); fake.sink = "alsa_output.jack"
+    w.tick()
+    assert ("bluetoothctl", "--timeout", "15", "connect", "AA:BB:CC:DD:EE:FF") in fake.calls
+    assert fake.sink.startswith("bluez") and w.info()["reconnects"] == 1
+    # ručné odpojenie v appke → nenaťahovať späť
+    w.manual_disconnect("AA:BB:CC:DD:EE:FF"); fake.connected.clear(); fake.calls.clear()
+    w.tick()
+    assert not any("connect" in c for c in fake.calls) and w.info()["paused"]
+    w.manual_connect("AA:BB:CC:DD:EE:FF")
+    # vypnuté auto pripojenie → nič
+    w.set_auto(False); w.tick()
+    assert not any("connect" in c for c in fake.calls)
+    # stav prežije reštart
+    w2 = SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    assert w2.info()["auto"] is False and w2.info()["mac"] == "AA:BB:CC:DD:EE:FF"
+    # neúspech: ostáva „pripájam“, chyba v stave
+    w2.set_auto(True); fake.fail = True; w2.tick()
+    assert w2.info()["reconnecting"] and "Failed" in w2.info()["error"]
+    w2.forget("AA:BB:CC:DD:EE:FF")
+    assert w2.info()["mac"] is None

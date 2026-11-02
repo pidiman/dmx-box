@@ -180,6 +180,7 @@ function live(d) {
     $("#track-artist").textContent = [tr.artist, tr.source && `· ${tr.source}`].filter(Boolean).join(" ");
   }
   sysStats(d.sys);
+  speakerState(d.speaker);
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
@@ -301,6 +302,31 @@ document.querySelectorAll(".info-btn").forEach((b) => b.addEventListener("click"
 $("#sh-close").addEventListener("click", closeInfo);
 $("#info-sheet").addEventListener("click", (ev) => { if (ev.target.id === "info-sheet") closeInfo(); });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeInfo(); });
+
+// --- BT reproduktor v menu ----------------------------------------------------------
+let spkBusy = false;
+function speakerState(sp) {
+  const row = $("#spk-row"), arow = $("#spk-auto-row");
+  row.hidden = arow.hidden = !(sp && sp.available);
+  if (row.hidden) return;
+  const b = $("#st-spk");
+  if (sp.connected) { b.textContent = sp.name || "pripojený"; b.className = "on"; }
+  else if (sp.reconnecting) { b.textContent = `pripájam ${sp.name || ""}…`; b.className = "warn"; }
+  else if (sp.mac) { b.textContent = sp.paused ? `${sp.name} · odpojený ručne` : `${sp.name} · odpojený`; b.className = "off"; }
+  else { b.textContent = "žiadny"; b.className = ""; }
+  b.title = b.textContent;
+  if (!spkBusy) $("#spk-auto").checked = !!sp.auto;
+}
+$("#spk-auto").addEventListener("change", async (ev) => {
+  spkBusy = true;
+  try {
+    const r = await fetch("/api/system/bt/autoreconnect", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ on: ev.target.checked }) });
+    if (!r.ok) throw new Error();
+    toast(ev.target.checked ? "Auto pripojenie reproduktora zapnuté" : "Auto pripojenie vypnuté");
+  } catch { ev.target.checked = !ev.target.checked; toast("Nepodarilo sa uložiť"); }
+  spkBusy = false;
+});
 
 function setOnline(on) {
   const c = $("#conn"), t = on ? "Box online" : "Box offline";
