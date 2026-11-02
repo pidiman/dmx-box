@@ -268,6 +268,21 @@ def bt_connect(mac: str) -> None:
     """Spárovať a pripojiť zariadenie (BT reproduktor)."""
     _mac(mac)
     bt_power_on()
+    # BlueZ zabudne nespárované zariadenie ~30 s po hľadaní → ak ho nepozná, krátko hľadaj znova
+    try:
+        run("bluetoothctl", "info", mac, timeout=5)
+        known = True
+    except CmdError:
+        known = False
+    if not known:
+        try:
+            run("bluetoothctl", "--timeout", "10", "scan", "on", timeout=20)
+        except CmdError:
+            pass
+        try:
+            run("bluetoothctl", "info", mac, timeout=5)
+        except CmdError as e:
+            raise CmdError("zariadenie sa nenašlo – daj ho do režimu párovania a skús znova") from e
     for step in (("pair", 30), ("trust", 10), ("connect", 30)):
         try:
             run("bluetoothctl", "--timeout", str(step[1]), step[0], mac, timeout=step[1] + 10)

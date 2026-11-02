@@ -964,3 +964,29 @@ def test_bt_adapter_status(tmp_path):
     (cls / "hci0" / "device").unlink(); uart.mkdir(parents=True); (cls / "hci0" / "device").symlink_to(uart.parent.parent)
     st = bt_adapter_status(sysfs, cfg, bl)
     assert st["current"] == "builtin" and not st["pending"]
+
+
+def test_bt_connect_rescans_forgotten_device(monkeypatch):
+    from dmxbox import system
+    calls, seen = [], {"known": False}
+
+    def fake_run(*cmd, **kw):
+        calls.append(cmd)
+        if cmd[:2] == ("bluetoothctl", "info"):
+            if not seen["known"]:
+                raise system.CmdError("Device F4:4E:FC:33:A4:B0 not available")
+            return "Name: HONOR"
+        if "scan" in cmd:
+            seen["known"] = True
+        return ""
+    monkeypatch.setattr(system, "run", fake_run)
+    system.bt_connect("F4:4E:FC:33:A4:B0")
+    names = [c[3] if c[1] == "--timeout" else c[1] for c in calls if c[0] == "bluetoothctl"]
+    assert names.index("scan") < names.index("pair") < names.index("connect")
+    # nenájde ani po hľadaní → zrozumiteľná chyba
+    seen["known"] = False
+    monkeypatch.setattr(system, "run", lambda *c, **k: (_ for _ in ()).throw(system.CmdError("not available"))
+                        if c[:2] == ("bluetoothctl", "info") else "")
+    import pytest as _p
+    with _p.raises(system.CmdError, match="režimu párovania"):
+        system.bt_connect("F4:4E:FC:33:A4:B0")

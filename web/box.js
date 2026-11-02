@@ -120,7 +120,7 @@ function renderBt() {
   for (const d of b.devices) {
     g.append(item(lbl(d.name, (d.speaker ? "reproduktor · " : "") + (d.connected ? "pripojený" : "spárovaný"), d.connected ? "ok" : ""),
       d.connected ? h("button", { onclick: () => act("bx", () => api("POST", "/api/system/bt/disconnect", { mac: d.mac }), "Odpojené") }, "Odpojiť")
-        : d.speaker ? h("button", { onclick: () => act("bc", () => api("POST", "/api/system/bt/connect", { mac: d.mac }), "Pripojené") }, "Pripojiť") : null,
+        : d.speaker ? h("button", { disabled: !!busy.bc, onclick: () => act("bc", () => api("POST", "/api/system/bt/connect", { mac: d.mac }), "Pripojené") }, busy.bc ? spin("Pripájam…") : "Pripojiť") : null,
       confirmBtn("Zabudnúť", "Naozaj?", () => act("bf", () => api("POST", "/api/system/bt/forget", { mac: d.mac }), "Zabudnuté"))));
   }
   const scan = h("button", { class: "linkbtn", disabled: !!busy.bs, onclick: async () => {
@@ -131,7 +131,14 @@ function renderBt() {
   } }, busy.bs ? spin("Hľadám 20 s…") : "+ Pridať Bluetooth reproduktor");
   g.append(h("div", { class: "item" }, scan));
   for (const d of btFound || []) {
-    g.append(item(lbl(d.name, d.mac), h("button", { onclick: () => act("bp", () => api("POST", "/api/system/bt/connect", { mac: d.mac }), `${d.name} spárovaný`) }, "Spárovať")));
+    const pairing = busy.bp === d.mac;
+    g.append(item(lbl(d.name, pairing ? "párujem a pripájam… (až 1 min, reproduktor nechaj v režime párovania)" : d.mac),
+      h("button", { disabled: !!busy.bp, onclick: async () => {
+        busy.bp = d.mac; render();
+        try { await api("POST", "/api/system/bt/connect", { mac: d.mac }); toast(`${d.name} spárovaný a pripojený`); btFound = null; }
+        catch (e) { toast("Párovanie zlyhalo: " + e.message, 7000); }
+        busy.bp = false; await refresh();
+      } }, pairing ? spin("Párujem…") : "Spárovať")));
   }
 }
 
