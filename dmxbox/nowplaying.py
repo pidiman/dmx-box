@@ -31,6 +31,7 @@ class Track:
     album: str = ""
     status: str = ""          # playing | paused | stopped
     source: str = ""          # meno zariadenia (napr. iPad)
+    path: str = ""            # D-Bus cesta BT prehrávača (play/pauza z appky)
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -65,7 +66,7 @@ def parse_objects(data: dict) -> Track:
     dev_path = path.rsplit("/", 1)[0]
     return Track(title=str(_val(track.get("Title", "")) or ""), artist=str(_val(track.get("Artist", "")) or ""),
                  album=str(_val(track.get("Album", "")) or ""), status=status,
-                 source=names.get(dev_path, ""))
+                 source=names.get(dev_path, ""), path=path)
 
 
 ITEM_RE = re.compile(r"<item><type>([0-9a-f]{8})</type><code>([0-9a-f]{8})</code><length>(\d+)</length>"

@@ -865,3 +865,78 @@ def test_bt_speaker_stall_fix(tmp_path, monkeypatch):
     # pozastavené ručným odpojením → neopravuje
     w._last_fix = 0.0; w.manual_disconnect("AA:BB:CC:DD:EE:FF"); w.state["paused"] = True
     w.tick()
+
+
+class _FakeAudio:
+    from dmxbox.system import CmdError
+
+    def __init__(self):
+        self.vol, self.muted, self.calls = 0.57, False, []
+
+    def has(self, _):
+        return True
+
+    def run(self, *cmd, timeout=15, sudo=False):
+        self.calls.append(cmd)
+        if cmd[:2] == ("wpctl", "get-volume"):
+            return f"Volume: {self.vol:.2f}" + (" [MUTED]" if self.muted else "")
+        if cmd[:2] == ("wpctl", "set-volume"):
+            arg = cmd[-1]
+            if arg.endswith(("+", "-")):
+                d = int(arg[:-2]) / 100
+                self.vol = min(1.0, self.vol + d) if arg.endswith("+") else max(0.0, self.vol - d)
+            else:
+                self.vol = int(arg[:-1]) / 100
+        if cmd[:2] == ("wpctl", "set-mute"):
+            self.muted = (not self.muted) if cmd[-1] == "toggle" else cmd[-1] == "1"
+        if cmd[:2] == ("busctl", "--user") and getattr(self, "no_mpris", False):
+            raise self.CmdError("No such interface")
+        return ""
+
+    def audio_status(self):
+        return {"sinks": [{"name": "bluez_output.X.1", "kind": "bluetooth", "label": "Bluetooth reproduktor",
+                           "description": "HONOR CHOICE Speaker Pro", "default": True}]}
+
+    def spotify_status(self):
+        return {"active": False}
+
+
+def test_player(tmp_path):
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.nowplaying import Track, stub
+    from dmxbox.player import Player
+    box = _box(tmp_path)
+    box.nowplaying = stub()
+    fa = _FakeAudio()
+    box.player = pl = Player(box, sysmod=fa)
+    pl.refresh()
+    i = pl.info()
+    assert i["volume"] == 57 and i["output"] == "HONOR CHOICE Speaker Pro" and i["source"] is None and not i["can_pause"]
+    # hlasitosť: krok aj priama hodnota
+    assert pl.volume(step=5)["volume"] == 62
+    assert pl.volume(value=30)["volume"] == 30
+    # bez ovládateľného zdroja → stlmenie
+    assert pl.toggle()["muted"] is True
+    assert pl.volume(step=5)["muted"] is False                 # zmena hlasitosti zvuk zapne
+    # AirPlay: pauza cez MPRIS
+    ap = box.nowplaying.airplay
+    ap.playing, ap.track = True, Track(title="Chimera", status="playing", source="iPad")
+    i = pl.info()
+    assert i["source"] == "airplay" and i["device"] == "iPad" and i["can_pause"] and i["playing"]
+    i = pl.toggle()
+    assert ("busctl", "--user", "call", "org.mpris.MediaPlayer2.ShairportSync", "/org/mpris/MediaPlayer2",
+            "org.mpris.MediaPlayer2.Player", "Pause") in fa.calls and i["playing"] is False
+    # Bluetooth zdroj: AVRCP
+    ap.playing = False
+    box.nowplaying.track = Track(title="X", status="playing", source="Mobil", path="/org/bluez/hci0/dev_AA/player0")
+    pl.toggle()
+    assert ("busctl", "--system", "call", "org.bluez", "/org/bluez/hci0/dev_AA/player0",
+            "org.bluez.MediaPlayer1", "Pause") in fa.calls
+    # API: AirPlay bez MPRIS → stlmí box
+    ap.playing, ap.track = True, Track(title="Y", status="playing")
+    fa.no_mpris = True; fa.muted = False
+    c = TestClient(create_app(box))
+    r = c.post("/api/player/toggle").json()
+    assert r["fallback"] == "mute" and fa.muted
+    assert c.post("/api/player/volume", json={"step": -5}).status_code == 200

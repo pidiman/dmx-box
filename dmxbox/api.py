@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import socket
 import time
 from dataclasses import asdict
@@ -23,6 +24,8 @@ from .effects.color import COLOR_FX, PALETTES
 from .effects.movement import MOVE_FX
 from .genre import STYLE_NAMES
 from .styles import STYLE_CHOICES, catalog as style_catalog
+
+log = logging.getLogger("dmxbox.api")
 
 
 class Patch(BaseModel):
@@ -51,6 +54,11 @@ class BpmBody(BaseModel):
 class WifiBody(BaseModel):
     ssid: str
     password: str = ""
+
+
+class VolumeBody(BaseModel):
+    value: int | None = None
+    step: int | None = None
 
 
 class MacBody(BaseModel):
@@ -241,6 +249,7 @@ def create_app(box) -> FastAPI:
             "sys": sysstats.get(),
             "speaker": box.speaker.info() if getattr(box, "speaker", None) else None,
             "airkeep": box.airkeep.info() if getattr(box, "airkeep", None) else None,
+            "player": box.player.info() if getattr(box, "player", None) else None,
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},
@@ -473,6 +482,32 @@ def create_app(box) -> FastAPI:
     @app.post("/api/system/airplay")
     def airplay(body: OnBody):
         return _cmd(system.airplay_set, body.on)
+
+    # --- prehrávač (hlasitosť, play/pauza) ---------------------------------------------
+    def player():
+        pl = getattr(box, "player", None)
+        if pl is None:
+            raise HTTPException(400, "prehrávač nie je dostupný")
+        return pl
+
+    @app.post("/api/player/volume")
+    def player_volume(body: VolumeBody):
+        return {"ok": True, "result": _cmd(player().volume, body.value, body.step)["result"]}
+
+    @app.post("/api/player/toggle")
+    def player_toggle():
+        pl = player()
+        try:
+            return {"ok": True, "result": pl.toggle()}
+        except system.CmdError as e:
+            # zdroj sa nedal ovládať (napr. AirPlay bez MPRIS) → aspoň stlmiť box
+            log.warning("play/pauza zdroja zlyhala (%s) – stlmujem box", e)
+            try:
+                pl.sys.run("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle", timeout=5)
+            except system.CmdError as e2:
+                raise HTTPException(400, str(e2)) from e2
+            pl.refresh()
+            return {"ok": True, "result": pl.info(), "fallback": "mute"}
 
     @app.post("/api/system/airplay/keep")
     def airplay_keep(body: OnBody):

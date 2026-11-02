@@ -101,6 +101,8 @@ Svetlá v texte: **lišta** = MAX PartyBar4, **hlava** = moving head Fractal Gob
 
 ## 2. FX kolesá
 
+**Prehrávač** (lišta pod hlavičkou): odkiaľ ide hudba a kam hrá (napr. *AirPlay · iPad → HONOR CHOICE Speaker Pro*), názov skladby, **Pauza / Play** a hlasitosť boxu (**−** / **+** po 5 %, posuvník). Pauza ovláda iPad/mobil pri AirPlay a Bluetooth; pri Spotify, kábli alebo keď zdroj ovládanie nedovolí, tlačidlo **stlmí** zvuk boxu.
+
 Dve kolesá ako v myDMX GO. **Ťuknutie na efekt ho zapne a vypne AUTO** (ďalej svieti len zvolená kombinácia). Aktívny efekt je zvýraznený a jeho meno je pri nadpise; pri tichu je tam „ticho“. Ikona **(i)** v pravom hornom rohu kolesa otvorí legendu: čo robí každý efekt, kedy sa hodí a ktorý práve beží.
 
 ### Koleso 1 – Farby (lišta, Belka PAR, derby, laser, farba hlavy)

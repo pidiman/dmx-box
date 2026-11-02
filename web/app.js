@@ -182,6 +182,7 @@ function live(d) {
   sysStats(d.sys);
   speakerState(d.speaker);
   airKeepState(d.airkeep);
+  playerState(d.player, d.track);
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";
@@ -328,6 +329,60 @@ $("#spk-auto").addEventListener("change", async (ev) => {
   } catch { ev.target.checked = !ev.target.checked; toast("Nepodarilo sa uložiť"); }
   spkBusy = false;
 });
+
+// --- prehrávač: zdroj → výstup, play/pauza, hlasitosť ------------------------------------
+const PB_IC = {
+  pause: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  play: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>',
+  mute: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>',
+  sound: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+};
+let pbHold = 0, pbLast = null;      // pbHold: kým používateľ ťahá posuvník, neprepisuj ho
+function pbSetVol(v) {
+  const r = $("#pb-vol");
+  if (v == null) { $("#pb-volout").textContent = "– %"; return; }
+  if (Date.now() > pbHold) r.value = v;
+  r.style.setProperty("--v", `${r.value}%`);
+  $("#pb-volout").textContent = `${r.value} %`;
+}
+function playerState(p, tr) {
+  const bar = $("#pbar");
+  bar.hidden = !(p && p.available);
+  if (bar.hidden) return;
+  pbLast = p;
+  const from = p.source ? [p.source_name, p.device].filter(Boolean).join(" · ") : "Nič nehrá";
+  $("#pb-route").textContent = p.output ? `${from} → ${p.output}` : from;
+  const title = tr && tr.title ? [tr.artist, tr.title].filter(Boolean).join(" – ") : (p.source ? p.source_name : "Pusti hudbu z mobilu alebo iPadu");
+  $("#pb-title").textContent = title;
+  const pp = $("#pb-pp");
+  let ic, txt;
+  if (p.can_pause) { ic = p.playing ? "pause" : "play"; txt = p.playing ? "Pauza" : "Play"; pp.className = "pp"; }
+  else { ic = p.muted ? "mute" : "sound"; txt = p.muted ? "Zapnúť zvuk" : "Stlmiť"; pp.className = "pp mute" + (p.muted ? " on" : ""); }
+  if (pp.dataset.ic !== ic) { $("#pb-ic").innerHTML = PB_IC[ic]; pp.dataset.ic = ic; }
+  $("#pb-t").textContent = txt; pp.setAttribute("aria-label", txt);
+  bar.classList.toggle("muted", !!p.muted);
+  pbSetVol(p.volume);
+}
+async function pbPost(path, body) {
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || r.statusText);
+    if (d.result) playerState(d.result, null);
+    if (d.fallback === "mute") toast("Zdroj sa nedá ovládať z boxu – stlmil som zvuk boxu");
+  } catch (e) { toast("Nepodarilo sa: " + e.message); }
+}
+$("#pb-pp").addEventListener("click", () => pbPost("/api/player/toggle"));
+$("#pb-minus").addEventListener("click", () => pbPost("/api/player/volume", { step: -5 }));
+$("#pb-plus").addEventListener("click", () => pbPost("/api/player/volume", { step: 5 }));
+$("#pb-vol").addEventListener("input", (e) => { pbHold = Date.now() + 2500; pbSetVol(+e.target.value); });
+$("#pb-vol").addEventListener("change", (e) => { pbHold = Date.now() + 2500; pbPost("/api/player/volume", { value: +e.target.value }); });
+// prehrávač sa lepí pod hlavičku – zisti jej výšku
+{
+  const top = document.querySelector("header.top");
+  const setH = () => document.documentElement.style.setProperty("--top-h", `${top.offsetHeight}px`);
+  setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top);
+}
 
 // --- AirPlay pri výpadku reproduktora --------------------------------------------------------
 let airBusy = false;

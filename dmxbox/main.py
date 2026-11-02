@@ -24,6 +24,7 @@ from .dmx_out import DMXOut
 from .engine import Engine
 from .fixtures import RigStore
 from .nowplaying import NowPlaying
+from .player import Player
 from .scenario import ScenarioStore
 from .sessionlog import LogHandler, SessionLog
 from .sim import GENRES, mix_source, synth_source
@@ -44,6 +45,7 @@ class Box:
     rig_store: RigStore | None = None
     speaker: SpeakerWatch | None = None
     airkeep: AirplayKeep | None = None
+    player: Player | None = None
     slog: SessionLog | None = None
     sysstats: object | None = None
 
@@ -108,6 +110,7 @@ def main() -> None:
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
     box = build(cfg, sim_bpm=args.sim, dry=args.dry, input_device=args.input, genre=args.genre)
+    box.player = Player(box)
     box.slog = SessionLog(resolve(cfg.get("log_dir", "logs")), box)
     logging.getLogger("dmxbox").addHandler(LogHandler(box.slog))
     box.out.start()
@@ -119,6 +122,7 @@ def main() -> None:
         box.speaker.start()
     if box.airkeep:
         box.airkeep.start()
+    box.player.start()
     box.slog.start()
     try:
         uvicorn.run(create_app(box), host=cfg["web"]["host"],
