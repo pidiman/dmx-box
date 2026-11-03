@@ -232,6 +232,14 @@ def create_app(box) -> FastAPI:
                 _bta["v"] = None
         return _bta["v"]
 
+    # verzia bežiaceho kódu (pri štarte) – v menu ovládania; po git pull bez reštartu ukáže starú
+    try:
+        version = {"commit": system.run("git", "-C", str(ROOT), "rev-parse", "--short", "HEAD", timeout=5),
+                   "date": system.run("git", "-C", str(ROOT), "log", "-1", "--format=%cd",
+                                      "--date=format:%d.%m. %H:%M", timeout=5)}
+    except system.CmdError:
+        version = None
+
     sysstats = system.SysStats()
     box.sysstats = sysstats                     # zdieľané so záznamom prevádzky
 
@@ -262,6 +270,7 @@ def create_app(box) -> FastAPI:
             "airkeep": box.airkeep.info() if getattr(box, "airkeep", None) else None,
             "player": box.player.info() if getattr(box, "player", None) else None,
             "bt_adapter": bt_adapter_cached(),
+            "version": version,
             "fog": {"on": box.engine.fog.status.on, "ready": box.engine.fog.status.ready,
                     "cooldown": round(box.engine.fog.status.cooldown_left, 1),
                     "present": "fog" in box.engine.rig},

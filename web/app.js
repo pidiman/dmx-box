@@ -184,6 +184,7 @@ function live(d) {
   airKeepState(d.airkeep);
   playerState(d.player, d.track);
   btAdapterState(d.bt_adapter);
+  if (d.version) { const v = $("#st-ver"); v.textContent = `${d.version.commit} · ${d.version.date}`; v.title = "commit, ktorý box práve beží"; }
   const dmx = $("#dmx");
   dmx.textContent = d.dmx.driver === "dry" ? "DMX dry" : "DMX";
   dmx.className = d.dmx.connected ? "on" : "off";

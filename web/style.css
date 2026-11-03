@@ -273,3 +273,4 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .menu-st .bt-ad .seg button:disabled { opacity: .4; cursor: not-allowed; }
 .menu-st .bt-ad-note { font-size: 11px; color: var(--muted); line-height: 1.35; }
 .menu-st .bt-ad-note.warn { color: var(--warn); }
+.menu-st b.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; max-width: none; }
