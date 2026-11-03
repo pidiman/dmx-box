@@ -58,11 +58,21 @@ class UDMXDevice:
         log.info("uDMX pripojený")
         return True
 
-    def send(self, data: bytes, chunk: int) -> None:
+    def send(self, data: bytes, chunk: int, prev: bytes | None = None) -> int:
+        """Pošle len zmenené kúsky (uDMX si hodnoty drží a do DMX ich vysiela sám).
+        prev=None = celý rámec. Kúsok, ktorý zlyhá, raz zopakuje. Vráti počet prenosov."""
+        n = 0
         for start in range(0, len(data), chunk):
             part = data[start:start + chunk]
-            self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE,
-                                   len(part), start, part, timeout=100)
+            if prev is not None and len(prev) == len(data) and prev[start:start + chunk] == part:
+                continue
+            try:
+                self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE, len(part), start, part, timeout=100)
+            except Exception:  # noqa: BLE001 – low-speed USB na Pi 3 občas vráti Overflow, druhý pokus prejde
+                time.sleep(0.002)
+                self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE, len(part), start, part, timeout=100)
+            n += 1
+        return n
 
     def close(self, reset: bool = False) -> None:
         """reset=True: USB reset dongla (zaseknutý uDMX hlási napr. [Errno 75] Overflow pri každom prenose)."""
@@ -91,6 +101,10 @@ class DMXOut(threading.Thread):
         self._halt = threading.Event()
         self.dev = UDMXDevice() if driver == "udmx" else None
         self.errors, self._err_logged = 0, 0.0
+        self._sent: bytes | None = None          # čo už dongle má (len zmeny + celý rámec raz za 1 s)
+        self._full_at = 0.0
+        self._fail_streak = 0
+        self.transfers = 0
         self.connected = driver == "dry"
         self.frames_sent = 0
         self.last = bytes(channels)
@@ -135,17 +149,27 @@ class DMXOut(threading.Thread):
             self.connected = self.dev.open()
             if not self.connected:
                 return
+        now = time.monotonic()
+        full = self._sent is None or now - self._full_at >= 1.0
         try:
-            self.dev.send(data, self.chunk)
+            self.transfers += self.dev.send(data, self.chunk, None if full else self._sent)
+            self._sent = data
+            if full:
+                self._full_at = now
             self.frames_sent += 1
+            self._fail_streak = 0
         except Exception as e:  # odpojenie, I/O chyba
             self.errors += 1
-            now = time.monotonic()
-            if now - self._err_logged > 30:              # nezahlcuj log rovnakou chybou každé 2 s
-                log.warning("uDMX chyba (%s), resetujem USB a pripájam znova (chýb: %d)", e, self.errors)
+            self._fail_streak += 1
+            self._sent = None                            # nevieme, čo dongle má → nabudúce celý rámec
+            if now - self._err_logged > 30:              # nezahlcuj log rovnakou chybou
+                log.warning("uDMX chyba (%s), chýb spolu: %d", e, self.errors)
                 self._err_logged = now
-            self.dev.close(reset=True)
-            self.connected = False
+            if self._fail_streak >= 5:                   # trvalá chyba (odpojený/zaseknutý) → reset a znova
+                log.warning("uDMX: 5 rámcov po sebe zlyhalo – resetujem USB a pripájam znova")
+                self.dev.close(reset=True)
+                self.connected = False
+                self._fail_streak = 0
 
     def run(self) -> None:
         next_t = time.monotonic()

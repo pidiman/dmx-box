@@ -1027,3 +1027,46 @@ def test_bt_connect_rescans_forgotten_device(monkeypatch):
     import pytest as _p
     with _p.raises(system.CmdError, match="režimu párovania"):
         system.bt_connect("F4:4E:FC:33:A4:B0")
+
+
+def test_udmx_send_changes_retry_and_reset(monkeypatch):
+    import dmxbox.dmx_out as dm
+    monkeypatch.setattr(dm.time, "sleep", lambda s: None)
+
+    class FakeUSB:
+        def __init__(self):
+            self.calls, self.fail_every, self.n, self.resets = [], 0, 0, 0
+            self.always_fail = False
+
+        def ctrl_transfer(self, rt, req, n, start, data, timeout=100):
+            self.n += 1
+            if self.always_fail or (self.fail_every and self.n % self.fail_every == 0):
+                raise OSError(75, "Overflow")
+            self.calls.append((start, bytes(data)))
+
+        def reset(self):
+            self.resets += 1
+
+    out = dm.DMXOut(driver="udmx", channels=40)
+    usb_ = FakeUSB()
+    out.dev.dev = usb_
+    out.dev.open = lambda: (setattr(out.dev, "dev", usb_) or True)
+    out.connected = True
+    frame = bytearray(40)
+    out._write(bytes(frame))
+    assert len(usb_.calls) == 5                        # prvý rámec celý (5 × 8 kanálov)
+    usb_.calls.clear(); frame[10] = 200
+    out._write(bytes(frame))
+    assert usb_.calls == [(8, bytes(frame[8:16]))]     # potom len zmenený kúsok
+    usb_.calls.clear(); out._write(bytes(frame))
+    assert usb_.calls == []                            # bez zmeny nič
+    # občasný Overflow: zopakuje sa a rámec prejde, nič sa neresetuje
+    usb_.fail_every = 3; frame[0] = 1; frame[39] = 9; out._full_at = 0
+    for _ in range(10):
+        out._write(bytes(frame))
+    assert out.connected and usb_.resets == 0
+    # trvalá chyba: po 5 rámcoch reset a odpojenie
+    usb_.always_fail = True; out._sent = None
+    for _ in range(5):
+        out._write(bytes(frame)); out._sent = None
+    assert usb_.resets == 1 and not out.connected
