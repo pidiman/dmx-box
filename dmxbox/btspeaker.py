@@ -66,10 +66,13 @@ class SpeakerWatch(threading.Thread):
 
     # volané z API pri ručných akciách v appke
     def manual_connect(self, mac: str) -> None:
-        """Ručné pripojenie obnoví automatiku; cieľ si strážca vezme, až keď uvidí pripojený reproduktor."""
+        """Ručné pripojenie v appke: tento reproduktor je odteraz cieľ, automatika beží."""
         with self.lock:
+            if self.state["mac"] != mac:
+                self.state.update(mac=mac, name="", want_output=True)
             self.state["paused"] = False
             self._save()
+        self._drop_since = None
 
     def manual_disconnect(self, mac: str) -> None:
         with self.lock:
@@ -240,7 +243,18 @@ class SpeakerWatch(threading.Thread):
                 if changed:
                     self._save()
             return
-        # odpojený
+        # odpojený – ak medzitým hrá iný spárovaný reproduktor, ten je nový cieľ (nenaháňaj starý)
+        try:
+            other = [(m, n) for m, n in self._speakers() if m != target]
+        except self.sys.CmdError:
+            other = []
+        if other:
+            with self.lock:
+                self.state.update(mac=other[0][0], name=other[0][1], paused=False)
+                self._save()
+            self._drop_since, self._fails, self._next_try = None, 0, 0.0
+            self.live.update(connected=True, reconnecting=False, error="")
+            return
         self._half_since = None
         if self.live.get("connected"):
             self.live["connected"] = False

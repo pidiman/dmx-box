@@ -720,6 +720,23 @@ def test_bt_speaker_autoreconnect(tmp_path, monkeypatch):
     assert w2.info()["mac"] is None
 
 
+def test_bt_speaker_switch_to_other_speaker(tmp_path, monkeypatch):
+    import dmxbox.btspeaker as bs
+    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
+    fake = _FakeBT()
+    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w.tick()                                           # HONOR (AA:…) pripojený
+    # HONOR vypnutý, pripojený JBL → nový cieľ, starý sa nenaháňa
+    fake.connected = {"11:22:33:44:55:66": "JBLemonko"}; fake.calls.clear()
+    w.GRACE_S = 0
+    w.tick(); w.tick()
+    assert w.info()["mac"] == "11:22:33:44:55:66" and w.info()["connected"]
+    assert not any(c[-1] == "AA:BB:CC:DD:EE:FF" and "connect" in c for c in fake.calls)
+    # ručné pripojenie iného reproduktora v appke = nový cieľ
+    w.manual_connect("AA:BB:CC:DD:EE:FF")
+    assert w.info()["mac"] == "AA:BB:CC:DD:EE:FF"
+
+
 def test_bt_speaker_stall_and_half_connection(tmp_path, monkeypatch):
     import dmxbox.btspeaker as bs
     monkeypatch.setattr(bs.time, "sleep", lambda s: None)
