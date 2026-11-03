@@ -202,9 +202,15 @@ class SpeakerWatch(threading.Thread):
             with self.lock:
                 self.state.update(mac=target, name=conn[0][1])
                 self._save()
-        connected = self._is_connected(target)
-        if connected is None:
+        info = self._info(target)
+        if not info:
             return
+        connected = "Connected: yes" in info
+        if connected and "Trusted: no" in info:     # bez dôvery BlueZ odmieta, keď sa reproduktor pripája sám
+            try:
+                self.sys.run("bluetoothctl", "trust", target, timeout=8)
+            except self.sys.CmdError:
+                pass
         if connected:
             recovered = self._drop_since is not None    # vrátil sa sám počas čakania
             self._drop_since = None

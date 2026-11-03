@@ -656,7 +656,8 @@ class _FakeBT:
         if cmd[:2] == ("pactl", "get-default-sink"):
             return self.sink
         if cmd[:2] == ("bluetoothctl", "info"):
-            return "Icon: audio-card\nConnected: " + ("yes" if cmd[2] in self.connected else "no")
+            return ("Icon: audio-card\nTrusted: " + ("yes" if getattr(self, "trusted", True) else "no")
+                    + "\nConnected: " + ("yes" if cmd[2] in self.connected else "no"))
         if cmd[:2] == ("bluetoothctl", "disconnect"):
             self.connected.pop(cmd[2], None)
             return ""
@@ -679,8 +680,11 @@ def test_bt_speaker_autoreconnect(tmp_path, monkeypatch):
     monkeypatch.setattr(bs.time, "sleep", lambda s: None)
     fake = _FakeBT()
     w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    fake.trusted = False
     w.tick()
     assert w.info()["connected"] and w.info()["name"] == "JBL Charge 3" and w.state["want_output"]
+    assert ("bluetoothctl", "trust", "AA:BB:CC:DD:EE:FF") in fake.calls
+    fake.trusted = True
     # pripojený reproduktor sa NIKDY znova nepripája (to rozbíjalo A2DP: „Device or resource busy“)
     fake.calls.clear()
     for _ in range(5):
