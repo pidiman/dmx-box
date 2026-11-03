@@ -15,6 +15,7 @@ import time
 log = logging.getLogger("dmxbox.dmx")
 
 VID, PID = 0x16C0, 0x05DC
+REQ_SET_SINGLE_CHANNEL = 1
 REQ_SET_CHANNEL_RANGE = 2
 BM_REQUEST_TYPE = 0x40  # vendor | device | host→device
 
@@ -37,6 +38,9 @@ def _backend():
 class UDMXDevice:
     def __init__(self):
         self.dev = None
+        self.range_fails = 0
+        self.single_until = 0.0
+        self.single_logged = False
 
     def open(self) -> bool:
         try:
@@ -60,18 +64,38 @@ class UDMXDevice:
 
     def send(self, data: bytes, chunk: int, prev: bytes | None = None) -> int:
         """Pošle len zmenené kúsky (uDMX si hodnoty drží a do DMX ich vysiela sám).
-        prev=None = celý rámec. Kúsok, ktorý zlyhá, raz zopakuje. Vráti počet prenosov."""
+        prev=None = celý rámec. Vráti počet USB prenosov.
+
+        Pi 3 (dwc_otg) má chybu v „split“ prenosoch k low-speed zariadeniam za hubom: prenosy
+        s dátovou fázou (SetChannelRange) zlyhávajú s Overflow, kým SetSingleChannel (hodnota
+        v hlavičke, bez dát) prechádza vždy. Keď rozsah zlyhá, kanály idú po jednom; pri
+        opakovaných chybách sa na 30 s prejde rovno na kanály po jednom."""
         n = 0
+        single = time.monotonic() < self.single_until
         for start in range(0, len(data), chunk):
             part = data[start:start + chunk]
-            if prev is not None and len(prev) == len(data) and prev[start:start + chunk] == part:
+            old = prev[start:start + chunk] if prev is not None and len(prev) == len(data) else None
+            if old == part:
                 continue
-            try:
-                self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE, len(part), start, part, timeout=100)
-            except Exception:  # noqa: BLE001 – low-speed USB na Pi 3 občas vráti Overflow, druhý pokus prejde
-                time.sleep(0.002)
-                self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE, len(part), start, part, timeout=100)
-            n += 1
+            if not single:
+                try:
+                    self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE, len(part), start, part, timeout=100)
+                    n += 1
+                    self.range_fails = max(0, self.range_fails - 1)
+                    continue
+                except Exception:  # noqa: BLE001
+                    self.range_fails += 1
+                    if self.range_fails >= 3:
+                        self.single_until = time.monotonic() + 30.0
+                        single = True
+                        if not self.single_logged:
+                            log.warning("uDMX: rozsahy kanálov zlyhávajú (USB Pi 3) – posielam kanály po jednom")
+                            self.single_logged = True
+            for i, v in enumerate(part):                 # po jednom: len zmenené kanály
+                if old is not None and old[i] == v:
+                    continue
+                self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_SINGLE_CHANNEL, v, start + i, None, timeout=100)
+                n += 1
         return n
 
     def close(self, reset: bool = False) -> None:

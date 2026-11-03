@@ -1040,9 +1040,9 @@ def test_udmx_send_changes_retry_and_reset(monkeypatch):
 
         def ctrl_transfer(self, rt, req, n, start, data, timeout=100):
             self.n += 1
-            if self.always_fail or (self.fail_every and self.n % self.fail_every == 0):
+            if self.always_fail or (req == 2 and getattr(self, "range_fail", False)):
                 raise OSError(75, "Overflow")
-            self.calls.append((start, bytes(data)))
+            self.calls.append((start, bytes(data)) if req == 2 else ("single", start, n))
 
         def reset(self):
             self.resets += 1
@@ -1060,11 +1060,14 @@ def test_udmx_send_changes_retry_and_reset(monkeypatch):
     assert usb_.calls == [(8, bytes(frame[8:16]))]     # potom len zmenený kúsok
     usb_.calls.clear(); out._write(bytes(frame))
     assert usb_.calls == []                            # bez zmeny nič
-    # občasný Overflow: zopakuje sa a rámec prejde, nič sa neresetuje
-    usb_.fail_every = 3; frame[0] = 1; frame[39] = 9; out._full_at = 0
+    # Pi 3: rozsahy (req 2) zlyhávajú, jednotlivé kanály (req 1) prechádzajú → svetlá idú ďalej
+    usb_.range_fail = True; frame[0] = 1; frame[39] = 9; out._full_at = 0; usb_.calls.clear()
     for _ in range(10):
+        frame[5] = (frame[5] + 7) % 256
         out._write(bytes(frame))
-    assert out.connected and usb_.resets == 0
+    assert out.connected and usb_.resets == 0 and out.dev.single_until > 0
+    assert ("single", 5, frame[5]) in usb_.calls
+    usb_.range_fail = False
     # trvalá chyba: po 5 rámcoch reset a odpojenie
     usb_.always_fail = True; out._sent = None
     for _ in range(5):
