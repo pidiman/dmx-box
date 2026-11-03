@@ -64,7 +64,13 @@ class UDMXDevice:
             self.dev.ctrl_transfer(BM_REQUEST_TYPE, REQ_SET_CHANNEL_RANGE,
                                    len(part), start, part, timeout=100)
 
-    def close(self) -> None:
+    def close(self, reset: bool = False) -> None:
+        """reset=True: USB reset dongla (zaseknutý uDMX hlási napr. [Errno 75] Overflow pri každom prenose)."""
+        if reset and self.dev is not None:
+            try:
+                self.dev.reset()
+            except Exception:  # noqa: BLE001 – dongle mohol medzitým zmiznúť
+                pass
         self.dev = None
 
 
@@ -84,6 +90,7 @@ class DMXOut(threading.Thread):
         self._current = bytes(channels)
         self._halt = threading.Event()
         self.dev = UDMXDevice() if driver == "udmx" else None
+        self.errors, self._err_logged = 0, 0.0
         self.connected = driver == "dry"
         self.frames_sent = 0
         self.last = bytes(channels)
@@ -132,8 +139,12 @@ class DMXOut(threading.Thread):
             self.dev.send(data, self.chunk)
             self.frames_sent += 1
         except Exception as e:  # odpojenie, I/O chyba
-            log.warning("uDMX chyba (%s), skúsim znova pripojiť", e)
-            self.dev.close()
+            self.errors += 1
+            now = time.monotonic()
+            if now - self._err_logged > 30:              # nezahlcuj log rovnakou chybou každé 2 s
+                log.warning("uDMX chyba (%s), resetujem USB a pripájam znova (chýb: %d)", e, self.errors)
+                self._err_logged = now
+            self.dev.close(reset=True)
             self.connected = False
 
     def run(self) -> None:
