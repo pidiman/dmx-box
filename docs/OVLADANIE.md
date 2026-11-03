@@ -126,7 +126,7 @@ Motor hlavy nestíha plynulé rýchle pohyby, preto rýchle efekty **skáču med
 | --- | --- |
 | **Skoky** | skok na ďalšiu z 10 pozícií v miestnosti na každú dobu; gobo sa mení každý takt. Hlavný režim. |
 | **Kruh** | pomalý kruh cez 8 dôb, otvorené svetlo bez gobo. Na pomalú hudbu. |
-| **Sweep** | pan zľava doprava a späť na každú dobu. |
+| **Sweep** | plynulý pan zľava doprava počas 4 dôb a späť počas ďalších 4, s jemným vlnením tiltu. |
 | **Tilt** | hore-dole na každú dobu, pan sa posunie každý takt. |
 | **Snap** | náhodná pozícia a gobo každé 2 doby; na kick sa rozsvieti naplno. |
 | **Nad hlavy** | pomalý plynulý pohyb nad hlavami ľudí (16 dôb), rotujúce gobo. |

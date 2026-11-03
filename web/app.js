@@ -37,7 +37,7 @@ const FX_INFO = {
     items: {
       jump: ["Skok na ďalšiu z 10 pozícií v miestnosti na každú dobu, gobo sa mení každý takt.", ["hlavný režim", "párty"]],
       circle_slow: ["Pomalý kruh cez 8 dôb, otvorené svetlo bez gobo.", ["pomalá hudba", "chill"]],
-      sweep: ["Pan zľava doprava a späť na každú dobu.", ["rytmické", "house"]],
+      sweep: ["Plynulý pohyb zľava doprava počas 4 dôb a späť počas ďalších 4.", ["rytmické", "house"]],
       tilt_bounce: ["Hore-dole na každú dobu, pan sa posunie každý takt.", ["rytmické", "pop"]],
       snap: ["Náhodná pozícia a gobo každé 2 doby, na kick sa rozsvieti naplno.", ["DnB", "techno"]],
       audience: ["Pomalý plynulý pohyb nad hlavami ľudí cez 16 dôb, rotujúce gobo.", ["breakdown", "atmosféra"]],

@@ -123,10 +123,18 @@ function headColor(v, t) {
 }
 
 // Fractal Mini LED Gobo Spot
-function drawHead(t, floor) {
+// zotrvačnosť motora: skutočná hlava prejde celý pan asi za 1,6 s, tilt za ~1 s
+// (pt_speed 255 = pomaly); viz ukazuje, kam hlava naozaj stihne dôjsť, nie len cieľ z DMX
+const HEAD = { pan: 0.5, tilt: 0.5 };
+const PAN_RATE = 0.62, TILT_RATE = 1.0;
+function drawHead(t, floor, dt = 0.016) {
   if (!FX.movinghead) return;
   const x = W * 0.5, y = H * 0.1 + 26 * DPR;
-  const pan = ch("movinghead", "pan") / 255, tilt = ch("movinghead", "tilt") / 255;
+  const slow = 1 - 0.85 * (ch("movinghead", "pt_speed") / 255);
+  const step = (cur, target, rate) => cur + Math.max(-rate * slow * dt, Math.min(rate * slow * dt, target - cur));
+  HEAD.pan = step(HEAD.pan, ch("movinghead", "pan") / 255, PAN_RATE);
+  HEAD.tilt = step(HEAD.tilt, ch("movinghead", "tilt") / 255, TILT_RATE);
+  const pan = HEAD.pan, tilt = HEAD.tilt;
   let a = ch("movinghead", "dimmer") / 255;
   const st = ch("movinghead", "strobe");
   if (st > 0 && a > 0) a = blink(t, 1 + (st / 255) * 18) ? a : 0;
@@ -368,7 +376,7 @@ function frame(ms) {
   drawFog(t, floor, dt);
   g.globalAlpha = 1;
   drawParbar(t, floor);
-  drawHead(t, floor);
+  drawHead(t, floor, dt);
   drawBelka(t, floor);
   drawGeneric(t, floor);
   g.globalCompositeOperation = "source-over";

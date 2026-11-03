@@ -42,8 +42,12 @@ def circle_slow(c: Ctx, L: Look) -> None:
 
 
 def sweep(c: Ctx, L: Look) -> None:
-    """Pan zo strany na stranu na beat."""
-    L.pan, L.tilt = _around(c, 0.2 if c.beat % 2 == 0 else 0.8, 0.5)
+    """Plynulý pan zo strany na stranu: 4 doby tam, 4 späť (sínus, v rytme).
+
+    Skok medzi krajmi na každú dobu motor lacnej hlavy nestihne (~250° za 0,5 s),
+    takže sa len šklbal okolo stredu. Plynulý pohyb cez takt motor sleduje."""
+    pos = 0.5 - 0.5 * math.cos(math.pi * (c.beats % 8) / 4)      # 0→1 za 4 doby, 1→0 ďalšie 4
+    L.pan, L.tilt = _around(c, 0.2 + 0.6 * pos, 0.5 + 0.08 * math.sin(math.pi * c.beats / 2))
     L.pt_speed = 0.0
     L.head_dim = 0.5 + 0.5 * c.pulse()
     L.gobo = 3
