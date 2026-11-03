@@ -129,38 +129,44 @@ const HEAD = { pan: 0.5, tilt: 0.5 };
 const PAN_RATE = 0.62, TILT_RATE = 1.0;
 function drawHead(t, floor, dt = 0.016) {
   if (!FX.movinghead) return;
-  const x = W * 0.5, y = H * 0.1 + 26 * DPR;
+  const onFloor = FX.movinghead.mount === "floor";       // stojí na zemi: lúč ide hore, DMX pan/tilt je otočený
+  const ceil = H * 0.1 + 8 * DPR;
+  const x = W * 0.5, y = onFloor ? floor - 34 * DPR : H * 0.1 + 26 * DPR;
   const slow = 1 - 0.85 * (ch("movinghead", "pt_speed") / 255);
   const step = (cur, target, rate) => cur + Math.max(-rate * slow * dt, Math.min(rate * slow * dt, target - cur));
   HEAD.pan = step(HEAD.pan, ch("movinghead", "pan") / 255, PAN_RATE);
   HEAD.tilt = step(HEAD.tilt, ch("movinghead", "tilt") / 255, TILT_RATE);
-  const pan = HEAD.pan, tilt = HEAD.tilt;
+  const pan = onFloor ? 1 - HEAD.pan : HEAD.pan, tilt = onFloor ? 1 - HEAD.tilt : HEAD.tilt;
   let a = ch("movinghead", "dimmer") / 255;
   const st = ch("movinghead", "strobe");
   if (st > 0 && a > 0) a = blink(t, 1 + (st / 255) * 18) ? a : 0;
   const col = headColor(ch("movinghead", "color"), t);
   // pan → vodorovný smer, tilt → ako ďaleko do miestnosti/na stenu
   const ang = (pan - 0.5) * Math.PI * 1.15;
-  const reach = floor - y;
+  const reach = onFloor ? y - ceil : floor - y;
   const ex = x + Math.sin(ang) * reach * (0.6 + tilt * 1.1);
-  const ey = Math.min(floor, y + reach * (0.25 + 0.75 * tilt));
+  const ey = onFloor ? Math.max(ceil, y - reach * (0.25 + 0.75 * tilt)) : Math.min(floor, y + reach * (0.25 + 0.75 * tilt));
+  const hit = onFloor ? ey <= ceil + 1 : ey >= floor - 1;  // spot dopadá na strop/podlahu (sploštený)
+  const ly = onFloor ? y - 10 * DPR : y + 10 * DPR;        // ústie lúča
   const gv = ch("movinghead", "gobo");
-  // telo hlavy
-  g.fillStyle = "#1d1d27"; g.fillRect(x - 22 * DPR, y - 20 * DPR, 44 * DPR, 14 * DPR);
-  g.save(); g.translate(x, y + 6 * DPR); g.rotate(Math.atan2(ex - x, ey - y) * -1);
-  g.fillStyle = "#24242f"; g.fillRect(-14 * DPR, -10 * DPR, 28 * DPR, 30 * DPR);
+  // telo hlavy (podstavec hore pri zavesenej, dole pri stojacej)
+  g.fillStyle = "#1d1d27"; g.fillRect(x - 22 * DPR, onFloor ? y + 6 * DPR : y - 20 * DPR, 44 * DPR, 14 * DPR);
+  g.save(); g.translate(x, onFloor ? y - 6 * DPR : y + 6 * DPR); g.rotate(Math.atan2(ex - x, ey - y) * -1);
+  g.fillStyle = "#24242f"; g.fillRect(-14 * DPR, onFloor ? -20 * DPR : -10 * DPR, 28 * DPR, 30 * DPR);
   g.restore();
   // LED krúžok
   const ring = ch("movinghead", "led_ring");
   if (ring > 0) for (let i = 0; i < 12; i++) {
     const aa = (i / 12) * Math.PI * 2 + t * 2;
-    glow(x + Math.cos(aa) * 26 * DPR, y + 8 * DPR + Math.sin(aa) * 10 * DPR, 7 * DPR, hsv((i / 12 + t * 0.3) % 1), 0.8);
+    glow(x + Math.cos(aa) * 26 * DPR, ly + Math.sin(aa) * 10 * DPR, 7 * DPR, hsv((i / 12 + t * 0.3) % 1), 0.8);
   }
-  if (a <= 0.01) { label("Moving head", x, y + 42 * DPR); return; }
-  beam(x, y + 10 * DPR, ex, ey, 5 * DPR, W * 0.03, col, a);
+  const name = onFloor ? "Moving head (na zemi)" : "Moving head";
+  const lblY = onFloor ? y + 32 * DPR : y + 42 * DPR;
+  if (a <= 0.01) { label(name, x, lblY); return; }
+  beam(x, ly, ex, ey, 5 * DPR, W * 0.03, col, a);
   // spot s gobom
   const r = W * 0.045;
-  g.save(); g.translate(ex, ey); g.scale(1, ey >= floor - 1 ? 0.35 : 0.8);
+  g.save(); g.translate(ex, ey); g.scale(1, hit ? 0.35 : 0.8);
   glow(0, 0, r * 1.8, col, a * 0.6);
   g.fillStyle = rgba(...col, a * 0.9);
   if (gv < 8) { g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill(); }
@@ -176,8 +182,8 @@ function drawHead(t, floor, dt = 0.016) {
     }
   }
   g.restore();
-  lamp(x, y + 10 * DPR, 6 * DPR, col, a);
-  label("Moving head", x, y + 42 * DPR);
+  lamp(x, ly, 6 * DPR, col, a);
+  label(name, x, lblY);
 }
 
 // Light4Me Belka: 2 PAR, derby, laser, strobo/UV modul
@@ -350,10 +356,14 @@ function drawGeneric(t, floor) {
     const pan = fnv(key, "pan"), tilt = fnv(key, "tilt");
     let ex = x, ey = floor;
     if (pan != null || tilt != null) {
-      const ang = (((pan ?? 128) / 255) - 0.5) * Math.PI * 1.1;
-      const reach = floor - y;
-      ex = x + Math.sin(ang) * reach * (0.6 + ((tilt ?? 128) / 255));
-      ey = Math.min(floor, y + reach * (0.25 + 0.75 * ((tilt ?? 128) / 255)));
+      const fl = f.mount === "floor";
+      let p = (pan ?? 128) / 255, tl = (tilt ?? 128) / 255;
+      if (fl) { p = 1 - p; tl = 1 - tl; }
+      const ang = (p - 0.5) * Math.PI * 1.1;
+      const top = H * 0.1 + 8 * DPR;
+      const reach = fl ? y - top : floor - y;
+      ex = x + Math.sin(ang) * reach * (0.6 + tl);
+      ey = fl ? Math.max(top, y - reach * (0.25 + 0.75 * tl)) : Math.min(floor, y + reach * (0.25 + 0.75 * tl));
     }
     if (a > 0.01) { beam(x, y, ex, ey, 6 * DPR, W * 0.04, c, a * 0.8); glow(ex, ey, W * 0.06, c, a * 0.35); }
     lamp(x, y, 8 * DPR, c, a);

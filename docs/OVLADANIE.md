@@ -58,6 +58,7 @@ Stránka **Svetlá** (`/lights.html`) – tvoj zoznam svetiel a iných DMX zaria
   - **Test kanálov** – posuvník pre každý kanál, svieti len toto svetlo (ako Simple Desk v QLC+).
   - **Upraviť**, **Vypnúť / Zapnúť** (ostane v zozname, box ho neovláda), **Zmazať** (potvrdenie druhým ťuknutím).
 - **+ Pridať svetlo:** model z knižnice → mód → značka (navrhne `SVETLOn`) → meno → **DMX adresa** (alebo **Nájsť voľnú adresu**) → pozícia → **Pridať**. Kontrola beží už pri písaní adresy: zelená = v poriadku, červená = s ktorým svetlom a na ktorých kanáloch sa prekrýva, s návrhom voľnej adresy.
+- **Montáž hlavy** (len moving head): *Strop / truss* alebo *Zem / stôl*. Na zemi box otočí pan aj tilt, aby pohyby mierili rovnako ako pri zavesenej (cez parket a nad hlavy, nie do očí); vizualizácia nakreslí hlavu na zemi s lúčom hore.
 - **Zrkadliť:** dve rovnaké svetlá (rovnaký model a mód) môžu mať zámerne rovnakú adresu – svietia identicky. Iné prekrytie box neuloží.
 - **Nový model:** keď svetlo nie je v knižnici – podľa manuálu zadáš počet kanálov a pri každom funkciu (červená, jas, pan, strobo…). Box podľa funkcií vie, ako svetlo ovládať. Stĺpec **Hodnota** (nepovinný): pri funkcii *Laser* hodnota, ktorá laser zapne (prázdne = 224, zvukový mód), pri *Efekt / Makro / Program / Iné* pevná hodnota, ktorú box stále drží (napr. stred polohy 64).
 - **Upraviť model:** pri vlastnom modeli v editore svetla – zmena funkcií a hodnôt platí hneď. Zmenu, po ktorej by sa svetlá prekrývali, box odmietne.

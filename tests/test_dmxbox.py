@@ -1073,3 +1073,30 @@ def test_udmx_send_changes_retry_and_reset(monkeypatch):
     for _ in range(5):
         out._write(bytes(frame)); out._sent = None
     assert usb_.resets == 1 and not out.connected
+
+
+def test_moving_head_floor_mount(tmp_path):
+    import time as _t
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.fixtures import ROOT, RigStore
+    box = _box(tmp_path)
+    box.rig_store = RigStore(tmp_path / "rig.yaml", ROOT / "rig.default.yaml")
+    c = TestClient(create_app(box))
+    a = box.analyzer.snapshot()
+    box.store.update(auto=False, move_fx="sweep")
+    h = box.engine.rig["movinghead"]
+    f1 = box.engine.compute(a, _t.monotonic())
+    pan1, tilt1 = f1[h.addr("pan") - 1], f1[h.addr("tilt") - 1]
+    assert h.mount == "ceiling"
+    assert c.put("/api/rig/fixture/movinghead", json={"mount": "zle"}).status_code == 400
+    r = c.put("/api/rig/fixture/movinghead", json={"mount": "floor"})
+    assert r.status_code == 200, r.text
+    h = box.engine.rig["movinghead"]
+    assert h.mount == "floor"
+    assert any(e.get("mount") == "floor" for e in r.json()["fixtures"])
+    # otočenie: rovnaká poloha efektu → zrkadlová DMX hodnota (tilt v rámci limitov 40–200)
+    assert h.aim("pan", 0.2) == 255 - h.aim("pan", 0.8) or abs(h.aim("pan", 0.2) - (255 - h.aim("pan", 0.8))) <= 1
+    lo, hi = h.limits["tilt"]
+    assert h.aim("tilt", 0.0) == hi and h.aim("tilt", 1.0) == lo
+    assert c.get("/api/fixtures").json()["movinghead"]["mount"] == "floor"

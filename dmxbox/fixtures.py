@@ -32,6 +32,7 @@ FUNCTIONS = {
 TYPES = {"par": "PAR / reflektor", "bar": "LED lišta", "moving_head": "Moving head", "effect": "Efekt (derby, laser…)",
          "fog": "Dymostroj", "other": "Iné"}
 POSITIONS = {"left": "vľavo", "center": "stred", "right": "vpravo"}
+MOUNTS = {"ceiling": "Strop / truss (zavesená)", "floor": "Zem / stôl (stojí)"}
 LABEL_RE = re.compile(r"^[A-Z0-9_-]{1,12}$")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 MAX_BACKUPS = 10
@@ -146,6 +147,7 @@ class Fixture:
     fns: dict[str, str] = field(default_factory=dict)     # logické meno → funkcia
     position: str = "center"
     defaults: dict[str, int] = field(default_factory=dict)  # pevné hodnoty kanálov z modelu
+    mount: str = "ceiling"     # moving head: ceiling = zavesená, floor = stojí na zemi (pan/tilt otočené)
 
     @property
     def footprint(self) -> int:
@@ -166,6 +168,14 @@ class Fixture:
     def get(self, frame: bytearray, ch: str) -> int:
         a = self.addr(ch)
         return frame[a - 1] if a is not None else 0
+
+    def aim(self, ch: str, value01: float) -> int:
+        """Pan/tilt 0–1 z efektu → DMX. Hlava na zemi je hore nohami oproti zavesenej:
+        otočí pan aj tilt, aby efekty mierili rovnako (cez parket, nie do očí/stropu)."""
+        v = max(0.0, min(1.0, value01))
+        if self.mount == "floor" and ch in ("pan", "tilt"):
+            v = 1.0 - v
+        return self.limit(ch, 255 * v)
 
     def limit(self, ch: str, value: float) -> int:
         """Premietne 0–255 do povoleného rozsahu kanála (napr. tilt)."""
@@ -209,7 +219,8 @@ def build_fixture(e: dict, profiles: dict[str, dict]) -> Fixture:
         ranges=m.get("ranges") or {}, values=m.get("values") or {}, limits=limits,
         label=e.get("label", ""), profile=e["profile"], mode=e["mode"], type=prof.get("type", "other"),
         fns={c["name"]: c.get("fn", "other") for c in chans}, position=e.get("position", "center"),
-        defaults={c["name"]: int(c["value"]) for c in chans if c.get("value") is not None})
+        defaults={c["name"]: int(c["value"]) for c in chans if c.get("value") is not None},
+        mount=e.get("mount") if e.get("mount") in MOUNTS else "ceiling")
 
 
 # --- kontrola zoznamu --------------------------------------------------------------

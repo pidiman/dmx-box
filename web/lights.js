@@ -84,7 +84,8 @@ function renderList() {
         h("span", { class: "label-chip", style: `background:${color(f.id)}` }, f.label),
         h("b", {}, f.name || f.model),
         f.enabled ? null : h("span", { class: "chip-s warn" }, "vypnuté"),
-        f.mirror ? h("span", { class: "chip-s" }, "zrkadlené") : null),
+        f.mirror ? h("span", { class: "chip-s" }, "zrkadlené") : null,
+        f.mount === "floor" ? h("span", { class: "chip-s" }, "na zemi") : null),
       h("div", { class: "small muted" }, `${f.model} · ${f.mode} · kanály ${f.address}–${f.end} · ${rig.positions[f.position] || "stred"}`),
       h("div", { class: "small" }, "Na svetle nastav adresu ", h("b", {}, pad3(f.address)), ` a mód ${f.mode.toUpperCase()}.`),
       h("div", { class: "fx-acts" },
@@ -156,7 +157,10 @@ function renderEditor() {
   const pos = h("select", { class: "full", onchange: (ev) => { e.position = ev.target.value; } },
     Object.entries(rig.positions).map(([k, v]) => h("option", { value: k, selected: k === e.position }, v)));
   const mirror = h("input", { type: "checkbox", checked: !!e.mirror, onchange: (ev) => { e.mirror = ev.target.checked; check(); } });
-  form.append(
+  const isHead = prof?.type === "moving_head";
+  const mount = isHead ? h("select", { class: "full", onchange: (ev) => { e.mount = ev.target.value; } },
+    Object.entries(rig.mounts || {}).map(([k, v]) => h("option", { value: k, selected: k === (e.mount || "ceiling") }, v))) : null;
+  form.append(...[
     h("label", { class: "f" }, "Model", sel),
     prof?.notes ? h("span", { class: "hint" }, prof.notes) : null,
     prof?.user ? h("button", { onclick: () => openProfiler(e) }, "Upraviť model (kanály, hodnoty)") : null,
@@ -166,11 +170,13 @@ function renderEditor() {
       h("label", { class: "f" }, "DMX adresa (1–512)", addr),
       h("label", { class: "f" }, "Pozícia", pos)),
     h("button", { onclick: findFree }, "Nájsť voľnú adresu"),
+    isHead ? h("label", { class: "f" }, "Montáž hlavy", mount,
+      h("span", { class: "hint" }, "Na zemi box otočí pan aj tilt, aby pohyby mierili rovnako ako pri zavesenej – cez parket a nad hlavy, nie do očí.")) : null,
     h("label", { class: "check" }, h("span", {}, "Zrkadliť – rovnaký model na rovnakej adrese, svietia rovnako"), mirror),
     h("div", { id: "ed-check", class: "banner ok" }, "…"),
     h("div", { class: "row2" },
       h("button", { onclick: () => { closeAll(); } }, "Zrušiť"),
-      h("button", { class: "toggle on", onclick: submit }, editing.id ? "Uložiť zmeny" : "Pridať svetlo")));
+      h("button", { class: "toggle on", onclick: submit }, editing.id ? "Uložiť zmeny" : "Pridať svetlo"))].filter(Boolean));
   check();
 }
 async function check() {
@@ -196,6 +202,7 @@ async function findFree() {
 async function submit() {
   const e = editing;
   const body = { label: e.label, name: e.name, profile: e.profile, mode: e.mode, address: +e.address, position: e.position, mirror: !!e.mirror };
+  if (profile(e.profile)?.type === "moving_head") body.mount = e.mount || "ceiling";
   if (await save(e.id, body, e.id ? `${e.label} uložené` : `${e.label} pridané – na svetle nastav adresu ${pad3(e.address)}`)) closeAll();
 }
 

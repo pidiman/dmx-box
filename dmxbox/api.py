@@ -293,7 +293,7 @@ def create_app(box) -> FastAPI:
         """Kanálové mapy pre virtuálne svetlá (web/viz.html)."""
         return {k: {"name": f.name, "start": f.start, "channels": f.channels,
                     "ranges": f.ranges, "values": f.values, "label": f.label, "type": f.type,
-                    "fns": f.fns, "position": f.position, "profile": f.profile,
+                    "fns": f.fns, "position": f.position, "profile": f.profile, "mount": f.mount,
                     "known": k in box.engine.KNOWN}
                 for k, f in box.engine.rig.fx.items()}
 
@@ -585,7 +585,7 @@ def create_app(box) -> FastAPI:
                                             for c in v.get("channels", [])]
                                         for m, v in (p.get("modes") or {}).items()}}
                              for p in profiles.values()],
-                "functions": fxlib.FUNCTIONS, "types": fxlib.TYPES, "positions": fxlib.POSITIONS, **(extra or {})}
+                "functions": fxlib.FUNCTIONS, "types": fxlib.TYPES, "positions": fxlib.POSITIONS, "mounts": fxlib.MOUNTS, **(extra or {})}
 
     def need_store():
         if not rig_store:
@@ -624,6 +624,10 @@ def create_app(box) -> FastAPI:
                 e[k] = bool(body[k])
         if e.get("position") not in fxlib.POSITIONS:
             e["position"] = "center"
+        if "mount" in body:
+            if body["mount"] not in fxlib.MOUNTS:
+                raise HTTPException(400, "neznáma montáž")
+            e["mount"] = body["mount"]
         return e
 
     @app.get("/api/rig")

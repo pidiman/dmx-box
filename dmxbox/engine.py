@@ -190,7 +190,7 @@ class Engine(threading.Thread):
                 elif fn == "uv":
                     fx.set(f, ch, 255 * L.strobe_uv * m)
                 elif fn in ("pan", "tilt"):
-                    fx.set(f, ch, fx.limit(fn, 255 * (L.pan if fn == "pan" else L.tilt)))
+                    fx.set(f, ch, fx.aim(fn, L.pan if fn == "pan" else L.tilt))
                 elif fn == "pt_speed":
                     fx.set(f, ch, 255 * L.pt_speed)
                 elif fn == "color_wheel" and fx.values.get("color"):
@@ -315,9 +315,9 @@ class Engine(threading.Thread):
 
         if "movinghead" in self.rig:
             h = self.rig["movinghead"]
-            h.set(f, "pan", 255 * L.pan)
+            h.set(f, "pan", h.aim("pan", L.pan))
             h.set(f, "pan_fine", 0)
-            h.set(f, "tilt", h.limit("tilt", 255 * L.tilt))
+            h.set(f, "tilt", h.aim("tilt", L.tilt))
             h.set(f, "tilt_fine", 0)
             h.set(f, "color", self._wheel(h, L.head_color))
             h.set(f, "gobo", self._gobo(h, L.gobo, L.gobo_mode))
