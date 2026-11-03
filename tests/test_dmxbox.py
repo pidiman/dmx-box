@@ -655,6 +655,11 @@ class _FakeBT:
         self.calls.append(cmd)
         if cmd[:2] == ("pactl", "get-default-sink"):
             return self.sink
+        if cmd[:2] == ("bluetoothctl", "info"):
+            return "Icon: audio-card\nConnected: " + ("yes" if cmd[2] in self.connected else "no")
+        if cmd[:2] == ("bluetoothctl", "disconnect"):
+            self.connected.pop(cmd[2], None)
+            return ""
         if "connect" in cmd:
             if self.fail:
                 raise self.CmdError("Failed to connect")
@@ -662,23 +667,38 @@ class _FakeBT:
         return ""
 
     def audio_status(self):
-        return {"sinks": [{"name": "bluez_output.AA_BB_CC_DD_EE_FF.1"}, {"name": "alsa_output.jack"}]}
+        bt = [{"name": "bluez_output.AA_BB_CC_DD_EE_FF.1"}] if self.connected else []
+        return {"sinks": bt + [{"name": "alsa_output.jack"}]}
 
     def audio_output(self, sink):
         self.sink = sink
 
 
-def test_bt_speaker_autoreconnect(tmp_path):
-    from dmxbox.btspeaker import SpeakerWatch
+def test_bt_speaker_autoreconnect(tmp_path, monkeypatch):
+    import dmxbox.btspeaker as bs
+    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
     fake = _FakeBT()
-    w = SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
     w.tick()
     assert w.info()["connected"] and w.info()["name"] == "JBL Charge 3" and w.state["want_output"]
-    # výpadok: zvuk spadne na jack, strážca reproduktor pripojí a vráti naň zvuk
-    fake.connected.clear(); fake.sink = "alsa_output.jack"
+    # pripojený reproduktor sa NIKDY znova nepripája (to rozbíjalo A2DP: „Device or resource busy“)
+    fake.calls.clear()
+    for _ in range(5):
+        w.tick()
+    assert not any("connect" in c for c in fake.calls)
+    # výpadok: najprv čaká (reproduktor sa môže pripojiť sám) …
+    fake.connected.clear(); fake.sink = "alsa_output.jack"; fake.calls.clear()
     w.tick()
-    assert ("bluetoothctl", "--timeout", "15", "connect", "AA:BB:CC:DD:EE:FF") in fake.calls
-    assert fake.sink.startswith("bluez") and w.info()["reconnects"] == 1
+    assert w.info()["reconnecting"] and not any(c[-2:-1] == ("connect",) for c in fake.calls)
+    # … pripojí sa sám počas čakania → box nič nerobí
+    fake.connected["AA:BB:CC:DD:EE:FF"] = "JBL Charge 3"; w.tick()
+    assert w.info()["connected"] and not any("--timeout" in c for c in fake.calls)
+    # výpadok a po čakaní sa nepripojil → jeden pokus, overený, zvuk späť
+    fake.connected.clear(); fake.sink = "alsa_output.jack"; fake.calls.clear()
+    w.GRACE_S = 0
+    w.tick(); w.tick()
+    assert sum(1 for c in fake.calls if "--timeout" in c) == 1
+    assert w.info()["connected"] and w.info()["reconnects"] == 1 and fake.sink.startswith("bluez")
     # ručné odpojenie v appke → nenaťahovať späť
     w.manual_disconnect("AA:BB:CC:DD:EE:FF"); fake.connected.clear(); fake.calls.clear()
     w.tick()
@@ -687,15 +707,37 @@ def test_bt_speaker_autoreconnect(tmp_path):
     # vypnuté auto pripojenie → nič
     w.set_auto(False); w.tick()
     assert not any("connect" in c for c in fake.calls)
-    # stav prežije reštart
-    w2 = SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w2 = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
     assert w2.info()["auto"] is False and w2.info()["mac"] == "AA:BB:CC:DD:EE:FF"
     # neúspech: ostáva „pripájam“, chyba v stave
-    w2.set_auto(True); fake.fail = True; w2.tick()
+    w2.set_auto(True); w2.GRACE_S = 0; fake.fail = True; w2.tick(); w2.tick()
     assert w2.info()["reconnecting"] and "Failed" in w2.info()["error"]
     w2.forget("AA:BB:CC:DD:EE:FF")
     assert w2.info()["mac"] is None
 
+
+def test_bt_speaker_stall_and_half_connection(tmp_path, monkeypatch):
+    import dmxbox.btspeaker as bs
+    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
+    fake = _FakeBT()
+    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    w.tick(); fake.calls.clear()
+    w.CYCLE_MIN_S = 0
+    w.kernel_line("Bluetooth: hci0: link tx timeout")
+    w.tick()
+    assert ("bluetoothctl", "disconnect", "AA:BB:CC:DD:EE:FF") in fake.calls
+    assert w.info()["stall_fixes"] == 1
+    fake.calls.clear(); w.tick()                       # vyriešené
+    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
+    # polovičné spojenie: Connected: yes, ale žiadny zvukový výstup dlhšie ako HALF_S
+    w.CYCLE_MIN_S = 60; w._last_fix = 0.0; w.HALF_S = 0
+    orig = fake.audio_status
+    fake.audio_status = lambda: {"sinks": [{"name": "alsa_output.jack"}]}
+    w.tick(); w.tick()
+    assert ("bluetoothctl", "disconnect", "AA:BB:CC:DD:EE:FF") in fake.calls
+    fake.calls.clear(); w.tick()                       # najviac raz za minútu
+    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
+    fake.audio_status = orig
 
 def test_session_log(tmp_path):
     import json as _json
@@ -839,32 +881,6 @@ def test_audio_output_skips_airplay_buffer(monkeypatch):
     system.audio_output("alsa_output.jack")
     moved = [c[2] for c in calls if c[:2] == ("pactl", "move-sink-input")]
     assert moved == ["72"]
-
-
-def test_bt_speaker_stall_fix(tmp_path, monkeypatch):
-    import dmxbox.btspeaker as bs
-    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
-    fake = _FakeBT()
-    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
-    w.tick()                                           # pripojený, zapamätaný
-    fake.calls.clear()
-    w.kernel_line("Bluetooth: hci0: link tx timeout")
-    w.kernel_line("iné hlásenie bez súvisu")
-    w._last_fix = 0.0
-    w.tick()
-    assert ("bluetoothctl", "disconnect", "AA:BB:CC:DD:EE:FF") in fake.calls
-    assert ("bluetoothctl", "--timeout", "15", "connect", "AA:BB:CC:DD:EE:FF") in fake.calls
-    assert w.info()["stall_fixes"] == 1
-    # vyriešené: ďalší tick už nič nerobí
-    fake.calls.clear(); w.tick()
-    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
-    # zamrznutie hneď po oprave (< 20 s): počká, neopakuje v slučke
-    w.kernel_line("Bluetooth: hci0: killing stalled connection aa:bb:cc:dd:ee:ff")
-    w.tick()
-    assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
-    # pozastavené ručným odpojením → neopravuje
-    w._last_fix = 0.0; w.manual_disconnect("AA:BB:CC:DD:EE:FF"); w.state["paused"] = True
-    w.tick()
 
 
 class _FakeAudio:

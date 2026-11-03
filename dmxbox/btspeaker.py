@@ -38,6 +38,8 @@ class SpeakerWatch(threading.Thread):
                      "stall_fixes": 0, "kernel_watch": False}
         # zamrznuté spojenie („link tx timeout“): bluetoothctl hlási Connected, ale zvuk netečie
         self._stall_at, self._last_fix = 0.0, 0.0
+        self._drop_since: float | None = None
+        self._half_since: float | None = None
         self._wake = threading.Event()
         self.available = sysmod.has("bluetoothctl")
         self._fails, self._next_try = 0, 0.0     # vypnutý reproduktor nenaháňať každých 10 s donekonečna
@@ -131,24 +133,6 @@ class SpeakerWatch(threading.Thread):
             if time.monotonic() - started < 5:          # bez prístupu k logu jadra – skús o minútu
                 self._halt.wait(60)
 
-    def _fix_stall(self, mac: str, want: bool) -> None:
-        log.warning("BT spojenie s %s zamrzlo (link tx timeout) – odpájam a pripájam znova", mac)
-        self._last_fix = time.monotonic()
-        self.live["reconnecting"] = True
-        try:
-            self.sys.run("bluetoothctl", "disconnect", mac, timeout=15)
-        except self.sys.CmdError:
-            pass
-        time.sleep(3)
-        try:
-            self.sys.run("bluetoothctl", "--timeout", "15", "connect", mac, timeout=25)
-        except self.sys.CmdError as e:
-            self.live.update(connected=False, error=str(e)[:120])
-            return                                   # ďalší tick to skúsi bežnou cestou
-        self.live.update(connected=True, reconnecting=False, error="")
-        self.live["stall_fixes"] += 1
-        self._restore_output(mac, want)
-
     def _restore_output(self, mac: str, want: bool) -> None:
         if not want:
             return
@@ -164,58 +148,122 @@ class SpeakerWatch(threading.Thread):
                 return
             time.sleep(1)
 
+    GRACE_S = 25.0          # po výpadku nechaj reproduktor/PipeWire pripojiť sa samých (inak sa pokusy bijú)
+    HALF_S = 25.0           # pripojený, ale bez zvukového výstupu tak dlho = polovičné spojenie
+    CYCLE_MIN_S = 60.0      # čisté odpojenie+pripojenie najviac raz za minútu
+
+    def _info(self, mac: str) -> str:
+        try:
+            return self.sys.run("bluetoothctl", "info", mac, timeout=8)
+        except self.sys.CmdError:
+            return ""
+
+    def _is_connected(self, mac: str) -> bool | None:
+        """True/False podľa BlueZ; None = nevieme (bluetoothctl neodpovedal) – vtedy nič nerob."""
+        info = self._info(mac)
+        if not info:
+            return None
+        return "Connected: yes" in info
+
+    def _clean_cycle(self, mac: str, want: bool, why: str) -> None:
+        log.warning("BT reproduktor %s: %s – odpájam a pripájam znova", mac, why)
+        self._last_fix = time.monotonic()
+        self.live["reconnecting"] = True
+        try:
+            self.sys.run("bluetoothctl", "disconnect", mac, timeout=15)
+        except self.sys.CmdError:
+            pass
+        time.sleep(3)
+        try:
+            self.sys.run("bluetoothctl", "--timeout", "15", "connect", mac, timeout=25)
+            self.live["stall_fixes"] += 1
+        except self.sys.CmdError as e:
+            self.live["error"] = str(e)[:120]
+        self._drop_since = None
+        self._restore_output(mac, want)
+
     def tick(self) -> None:
         if not self.available:
             return
-        try:
-            conn = self._speakers()
-        except self.sys.CmdError as e:
-            self.live["error"] = str(e)
-            return
+        now = time.monotonic()
         with self.lock:
-            target = self.state["mac"]
-        stalled = self._stall_at > self._last_fix
-        if conn:
-            mac, name = next(((m, n) for m, n in conn if m == target), conn[0])
-            with self.lock:
-                fix = (stalled and mac == target and self.state["auto"] and not self.state["paused"]
-                       and time.monotonic() - self._last_fix > 20)
-                want_now = self.state["want_output"]
-            if fix:
-                self._fix_stall(mac, want_now)
+            target, auto, paused = self.state["mac"], self.state["auto"], self.state["paused"]
+            want = self.state["want_output"]
+        if not target:                                   # ešte nepoznáme reproduktor: nájdi pripojený
+            try:
+                conn = self._speakers()
+            except self.sys.CmdError as e:
+                self.live["error"] = str(e)
                 return
-            on_bt = self._default_sink().startswith("bluez")
-            self._fails, self._next_try = 0, 0.0
+            if not conn:
+                self.live.update(connected=False, reconnecting=False)
+                return
+            target = conn[0][0]
             with self.lock:
-                changed = (mac, name, on_bt) != (self.state["mac"], self.state["name"], self.state["want_output"])
-                self.state.update(mac=mac, name=name, want_output=on_bt, paused=False)
+                self.state.update(mac=target, name=conn[0][1])
+                self._save()
+        connected = self._is_connected(target)
+        if connected is None:
+            return
+        if connected:
+            recovered = self._drop_since is not None    # vrátil sa sám počas čakania
+            self._drop_since = None
+            self._fails, self._next_try = 0, 0.0
+            sink = self._sink_of(target)
+            if recovered and sink and want:
+                self._restore_output(target, want)       # zvuk späť naň; „want“ neprepisuj jackom
+            on_bt = self._default_sink().startswith("bluez")
+            if sink:
+                self._half_since = None
+            elif self._half_since is None:
+                self._half_since = now
+            stalled = self._stall_at > self._last_fix
+            half = self._half_since is not None and now - self._half_since > self.HALF_S
+            if (auto and not paused and (stalled or (half and want))
+                    and now - self._last_fix > self.CYCLE_MIN_S):
+                self._clean_cycle(target, want, "zamrznuté spojenie" if stalled else "pripojený bez zvukového výstupu")
+                return
+            name = self.state["name"]
+            if not name:
+                name = next((n for m, n in self.sys._bt_devices("Connected") if m == target), "")
+            with self.lock:
+                changed = (name, on_bt) != (self.state["name"], self.state["want_output"]) and bool(sink)
+                if sink:                                 # výstup si pamätaj len pri plnom spojení
+                    self.state.update(name=name, want_output=on_bt, paused=False)
                 self.live.update(connected=True, reconnecting=False, error="")
                 if changed:
                     self._save()
             return
-        with self.lock:
+        # odpojený
+        self._half_since = None
+        if self.live.get("connected"):
             self.live["connected"] = False
-            go = self.state["auto"] and self.state["mac"] and not self.state["paused"]
-            mac, want = self.state["mac"], self.state["want_output"]
-        if not go:
+        if not auto or paused:
             self.live["reconnecting"] = False
+            self._drop_since = None
             return
+        if self._drop_since is None:
+            self._drop_since = now
         self.live["reconnecting"] = True
-        if time.monotonic() < self._next_try:
+        if now - self._drop_since < self.GRACE_S or now < self._next_try:
             return
         try:
-            self.sys.run("bluetoothctl", "--timeout", "15", "connect", mac, timeout=25)
+            self.sys.run("bluetoothctl", "--timeout", "15", "connect", target, timeout=25)
         except self.sys.CmdError as e:
             self.live["error"] = str(e)[:120]
-            self._fails += 1                     # 10 s, 20 s … max 60 s medzi pokusmi
+            self._fails += 1                             # 10 s, 20 s … max 60 s medzi pokusmi
             self._next_try = time.monotonic() + min(60.0, self.interval * self._fails)
             return
-        self._fails, self._next_try = 0, 0.0
-        self._last_fix = time.monotonic()            # zamrznutie vyriešené novým spojením
-        log.info("BT reproduktor %s znova pripojený", mac)
-        self.live.update(connected=True, reconnecting=False, error="")
-        self.live["reconnects"] += 1
-        self._restore_output(mac, want)
+        self._last_fix = time.monotonic()
+        if self._is_connected(target):                   # over, nie naslepo
+            log.info("BT reproduktor %s znova pripojený", target)
+            self._fails, self._next_try, self._drop_since = 0, 0.0, None
+            self.live.update(connected=True, reconnecting=False, error="")
+            self.live["reconnects"] += 1
+            self._restore_output(target, want)
+        else:
+            self._fails += 1
+            self._next_try = time.monotonic() + min(60.0, self.interval * self._fails)
 
     def run(self) -> None:
         if self.available and self.sys.has("journalctl"):
