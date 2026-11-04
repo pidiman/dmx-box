@@ -175,7 +175,14 @@ class Fixture:
         v = max(0.0, min(1.0, value01))
         if self.mount == "floor" and ch in ("pan", "tilt"):
             v = 1.0 - v
+            if ch == "tilt":                      # stojí na zemi: lúč len na strop/steny, nikdy vodorovne do očí
+                lo, hi = self.limits.get("tilt_floor", self.FLOOR_TILT)
+                return clamp8(lo + (hi - lo) * v)
         return self.limit(ch, 255 * v)
+
+    # Kalibrované webkamerou (Fractal Mini LED Gobo Spot 30W, tilt 270°): kolmo hore ≈ 140,
+    # vodorovne ≈ 55 a 225. Pás 83–197 = ±60° od zvislice.
+    FLOOR_TILT = (83, 197)
 
     def limit(self, ch: str, value: float) -> int:
         """Premietne 0–255 do povoleného rozsahu kanála (napr. tilt)."""
