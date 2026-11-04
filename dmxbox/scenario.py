@@ -28,7 +28,7 @@ SCENARIOS = [
      "tags": ["Wi-Fi s internetom", "Premium"],
      "warn": "S novšími Spotify účtami zatiaľ nefunguje."},
     {"id": "linein", "name": "Kábel z DJ pultu alebo PC",
-     "desc": "Hudba ide káblom do vstupu zvukovej karty UCA202. Najmenšie oneskorenie.",
+     "desc": "Hudba ide káblom do vstupu USB zvukovej karty (UCA202/UMC). Najmenšie oneskorenie.",
      "tags": ["Line-in", "Bez oneskorenia"]},
     {"id": "btspeaker", "name": "Bluetooth reproduktor",
      "desc": "Hudba cez AirPlay, Spotify alebo kábel, zvuk ide do BT reproduktora. Svetlá sa oneskoria, aby sedeli.",
@@ -112,7 +112,7 @@ def apply(box, data: dict) -> dict:
     delay = int(data.get("delay_ms", 200 if sid == "btspeaker" else 0))
     box.line_in.set(False)          # loopback na nový výstup
     if line_in and not box.line_in.set(True):
-        warnings.append("Line-in: vstup UCA202 nenájdený")
+        warnings.append("Line-in: vstup USB zvukovej karty nenájdený")
 
     upd = {"auto": True, "style": style, "ambient": sid == "ambient", "line_in": line_in,
            "light_delay_ms": max(0, min(500, delay)), "blackout": False, "manual_color": None}

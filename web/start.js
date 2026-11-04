@@ -153,10 +153,10 @@ function stepAirplay(n) {
 }
 
 function stepLinein(n) {
-  const usb = (sys?.audio?.sinks || []).some((s) => s.kind === "usb");
+  const usb = (sys?.audio?.sinks || []).find((s) => s.kind === "usb");
   return step(n, "Zapoj kábel",
-    h("p", {}, "Kábel z DJ pultu alebo PC zapoj do vstupu (IN) zvukovej karty UCA202 v boxe."),
-    usb ? row(true, "● UCA202 pripojená") : row(false, "UCA202 nenájdená – zapoj ju do USB portu boxu"));
+    h("p", {}, "Kábel z DJ pultu alebo PC zapoj do vstupu (IN) USB zvukovej karty v boxe (napr. UCA202/UMC)."),
+    usb ? row(true, `● ${usb.label || "USB zvuková karta"} pripojená`) : row(false, "USB zvuková karta nenájdená – zapoj ju do USB portu boxu"));
 }
 
 let scanning = false, found = [];
@@ -188,7 +188,7 @@ function stepSource(n) {
   return step(n, "Odkiaľ pôjde hudba", h("div", { class: "opts" },
     opt("airplay", "AirPlay z iPhonu / iPadu", `Ovládacie centrum → AirPlay → ${NAME()}`),
     opt("spotify", "Spotify Connect", `V Spotify vyber zariadenie ${NAME()}`),
-    opt("linein", "Kábel do UCA202", "DJ pult, PC, prehrávač")),
+    opt("linein", "Kábel do USB zvukovej karty", "DJ pult, PC, prehrávač")),
     step2Delay());
 }
 function step2Delay() {
@@ -205,8 +205,8 @@ function stepOutput(n) {
   return step(n, "Kam pôjde zvuk",
     sinks.length ? h("div", { class: "opts" }, sinks.map((s) =>
       h("button", { class: "opt" + (choice.output === s.name ? " on" : ""), onclick: () => { choice.output = s.name; renderSteps(true); } },
-        h("span", { class: "r" }), h("span", {}, h("b", {}, s.label), h("small", {}, s.kind === "usb" ? "AUX reproduktora do výstupu UCA202" : s.kind === "jack" ? "Kábel do 3,5 mm jacku na Pi" : s.description)))))
-      : row(false, "Žiadny zvukový výstup. Zapoj UCA202 do USB, alebo zapni jack na Pi (návod: Riešenie problémov v docs/PREVADZKA.md) a reštartuj box."),
+        h("span", { class: "r" }), h("span", {}, h("b", {}, s.label), h("small", {}, s.kind === "usb" ? "AUX reproduktora do výstupu USB karty" : s.kind === "jack" ? "Kábel do 3,5 mm jacku na Pi" : s.description)))))
+      : row(false, "Žiadny zvukový výstup. Zapoj USB zvukovú kartu, alebo zapni jack na Pi (návod: Riešenie problémov v docs/PREVADZKA.md) a reštartuj box."),
     vol != null ? h("label", { style: "display:grid;gap:6px;font-size:14px;color:#a3a3b8" }, "Hlasitosť boxu",
       h("input", { type: "range", min: 0, max: 100, value: choice.volume ?? vol, onchange: (e) => { choice.volume = +e.target.value; } })) : null);
 }

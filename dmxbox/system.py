@@ -308,7 +308,19 @@ def _sink_kind(name: str) -> str:
     return "other"
 
 
-KIND_NAMES = {"usb": "Zvuková karta USB (UCA202)", "jack": "Jack na Pi (3,5 mm)",
+def _usb_label(name: str, desc: str) -> str:
+    """alsa_output.usb-C-Media_Electronics_Inc._USB_Audio_Device-00.analog-stereo → „USB karta C-Media (USB Audio Device)“."""
+    m = re.search(r"usb-(.+)-\d\d(?:\.|$)", name)
+    vendor = ""
+    if m:
+        vendor = m.group(1).split("_")[0].replace("BurrBrown", "Behringer/Burr-Brown")
+    model = re.sub(r"\s*(Analog|Digital)\s+(Stereo|Mono|Surround).*$", "", desc or "").strip()
+    if vendor and model:
+        return f"USB karta {vendor} ({model})"
+    return f"USB karta {vendor or model}".strip()
+
+
+KIND_NAMES = {"usb": "Zvuková karta USB", "jack": "Jack na Pi (3,5 mm)",
               "bluetooth": "Bluetooth reproduktor", "hdmi": "HDMI", "other": "Iný výstup"}
 
 
@@ -332,7 +344,7 @@ def audio_status() -> dict:
                 if "null" in name.lower():
                     kind = "other"
                 st["sinks"].append({"name": name, "description": desc, "kind": kind,
-                                    "label": KIND_NAMES[kind] if kind != "other" else desc,
+                                    "label": _usb_label(name, desc) if kind == "usb" else KIND_NAMES[kind] if kind != "other" else desc,
                                     "default": name == st["default"]})
                 name = None
     except CmdError as e:
