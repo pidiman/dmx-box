@@ -32,6 +32,10 @@ class Patch(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class MuteBody(BaseModel):
+    on: bool
+
+
 class FxBody(BaseModel):
     wheel: int
     fx: str
@@ -716,6 +720,63 @@ def create_app(box) -> FastAPI:
         vals = {k: max(0, min(255, int(v))) for k, v in body.model_dump().items() if k in fx.channels}
         box.engine.test = (fx, vals, _t.monotonic() + 4.0)
         return {"ok": True}
+
+    # --- Ovládanie: čo ide do každého svetla + PLAY/STOP ------------------------------------
+    def _hex(rgb) -> str:
+        return "#%02x%02x%02x" % tuple(max(0, min(255, int(v))) for v in rgb)
+
+    def fixture_live(key: str, fx, frame: bytes) -> dict:
+        def val(fn):
+            vs = [frame[a - 1] for ch, f in fx.fns.items() if f == fn
+                  for a in [fx.addr(ch)] if a and a <= len(frame)]
+            return max(vs) if vs else None
+        r, g, b, w = (val(c) for c in ("red", "green", "blue", "white"))
+        dim = val("dimmer")
+        L = box.engine.last_look
+        if r is not None or g is not None or b is not None:
+            w = w or 0
+            rgb = [min(255, (r or 0) + w), min(255, (g or 0) + w), min(255, (b or 0) + w)]
+        elif fx.type == "moving_head" and L is not None:
+            c = L.head_color
+            rgb = [255 * min(1.0, c[0] + c[3]), 255 * min(1.0, c[1] + c[3]), 255 * min(1.0, c[2] + c[3])]
+        else:
+            rgb = [255, 255, 255]
+        peak = max(rgb) or 1
+        color = _hex([v * 255 / peak for v in rgb])           # farba bez jasu, jas ide zvlášť
+        level = dim / 255 if dim is not None else max(rgb) / 255
+        if dim is not None and (r is not None or g is not None or b is not None):
+            level *= max(rgb) / 255                          # dimmer aj farba: zhasnuté RGB = tma
+        las, fog = val("laser"), val("fog")
+        if fx.type == "laser" or (las is not None and r is None and dim is None):
+            level = 1.0 if las else 0.0
+        if fx.type == "fog":
+            level = 1.0 if fog else 0.0
+        info = {}
+        for k, fn in (("pan", "pan"), ("tilt", "tilt"), ("gobo", "gobo"), ("derby", "motor"),
+                      ("laser", "laser"), ("uv", "uv"), ("strobo", "strobe"), ("dym", "fog")):
+            v = val(fn)
+            if v is not None:
+                info[k] = v
+        chans = [frame[fx.start - 1 + i] for i in range(fx.footprint)
+                 if fx.start and fx.start - 1 + i < len(frame)]
+        return {"id": key, "name": fx.name, "label": fx.label, "type": fx.type, "start": fx.start,
+                "end": fx.start + fx.footprint - 1, "mount": fx.mount, "muted": key in box.engine.muted,
+                "color": color, "level": round(max(0.0, min(1.0, level)), 2),
+                "dimmer": None if dim is None else round(dim / 255 * 100), "info": info,
+                "active": any(chans)}
+
+    @app.get("/api/rig/live")
+    def rig_live():
+        frame = bytes(box.out.last or b"")
+        frame = frame + bytes(max(0, 512 - len(frame)))
+        return {"fixtures": [fixture_live(k, f, frame) for k, f in box.engine.rig.fx.items()]}
+
+    @app.post("/api/rig/mute/{key}")
+    def rig_mute(key: str, body: MuteBody):
+        if key not in box.engine.rig.fx:
+            raise HTTPException(404, "svetlo nenájdené")
+        (box.engine.muted.add if body.on else box.engine.muted.discard)(key)
+        return rig_live()
 
     @app.post("/api/rig/test-stop")
     def test_stop():

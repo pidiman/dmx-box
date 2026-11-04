@@ -1131,3 +1131,34 @@ def test_static_no_cache(tmp_path):
     r = c.get("/style.css")
     assert r.status_code == 200 and r.headers.get("cache-control") == "no-cache"
     assert "no-cache" not in c.get("/api/state").headers.get("cache-control", "")
+
+
+def test_rig_live_and_mute(tmp_path):
+    import time as _t
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    box = _box(tmp_path)
+    c = TestClient(create_app(box))
+    box.store.update(auto=False, color_fx="color_step", master=1.0)
+    f = box.engine.compute(box.analyzer.snapshot(), _t.monotonic())
+    box.out.last = bytes(f)
+    live = {x["id"]: x for x in c.get("/api/rig/live").json()["fixtures"]}
+    assert set(live) >= {"parbar", "movinghead", "belka"}
+    p = live["parbar"]
+    assert p["start"] == 1 and p["color"].startswith("#") and 0 <= p["level"] <= 1 and not p["muted"]
+    assert "pan" in live["movinghead"]["info"] and "tilt" in live["movinghead"]["info"]
+    # STOP: kanály svetla na 0, hlava drží pan/tilt
+    r = c.post("/api/rig/mute/parbar", json={"on": True})
+    assert r.status_code == 200
+    assert c.post("/api/rig/mute/movinghead", json={"on": True}).status_code == 200
+    f = box.engine.compute(box.analyzer.snapshot(), _t.monotonic())
+    pb, h = box.engine.rig["parbar"], box.engine.rig["movinghead"]
+    assert all(f[pb.start - 1 + i] == 0 for i in range(pb.footprint))
+    assert f[h.addr("dimmer") - 1] == 0 and f[h.addr("tilt") - 1] > 0
+    box.out.last = bytes(f)
+    live = {x["id"]: x for x in c.get("/api/rig/live").json()["fixtures"]}
+    assert live["parbar"]["muted"] and not live["parbar"]["active"] and live["parbar"]["level"] == 0
+    # PLAY: späť do show
+    c.post("/api/rig/mute/parbar", json={"on": False})
+    assert "parbar" not in box.engine.muted
+    assert c.post("/api/rig/mute/nic", json={"on": True}).status_code == 404

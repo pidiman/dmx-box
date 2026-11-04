@@ -541,3 +541,89 @@ async function init() {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 init().catch(err);
+
+// --- Svetlá – DMX výstup: karta pre každé svetlo + PLAY/STOP ------------------------------------
+{
+  const grid = $("#lv-grid"), sec = document.querySelector("section.lv"), sw = $("#lv-on");
+  const cards = {};
+  const MOUNT = { floor: "zem", ceiling: "" };
+  let on = false, timer = 0, busy = false;
+  try { on = localStorage.getItem("dmxLive") === "1"; } catch { /* súkromné okno */ }
+  sw.checked = on;
+  const chip = (k, v) => { const s = document.createElement("span"); s.innerHTML = `<em>${k}</em>`; s.append(v); return s; };
+  function card(x) {
+    const el = document.createElement("div");
+    el.className = "lvc";
+    el.innerHTML = `<div class="lamp"><i></i></div><div class="nm"><b></b><small></small></div>
+      <button class="pp2"></button><div class="kv"></div><div class="meter"><i></i></div>`;
+    el.querySelector(".pp2").addEventListener("click", async () => {
+      const cur = cards[x.id].muted;
+      try {
+        const r = await fetch(`/api/rig/mute/${encodeURIComponent(x.id)}`, { method: "POST",
+          headers: { "content-type": "application/json" }, body: JSON.stringify({ on: !cur }) });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+        render((await r.json()).fixtures);
+        toast(cur ? `${x.name}: PLAY – späť v show` : `${x.name}: STOP – zhasnuté`);
+      } catch (e) { toast("Nepodarilo sa: " + e.message); }
+    });
+    grid.append(el);
+    return el;
+  }
+  function render(list) {
+    const seen = new Set();
+    for (const x of list) {
+      seen.add(x.id);
+      const el = (cards[x.id] && cards[x.id].el) || card(x);
+      cards[x.id] = { el, muted: x.muted };
+      el.classList.toggle("muted", x.muted);
+      el.querySelector(".nm b").textContent = x.name;
+      el.querySelector(".nm small").textContent = [x.label, `${x.start}–${x.end}`, MOUNT[x.mount] || ""].filter(Boolean).join(" · ");
+      const lamp = el.querySelector(".lamp"), dot = lamp.querySelector("i"), lvl = on ? x.level : 0;
+      const laser = x.type === "laser";
+      dot.style.background = lvl > 0.02 ? (laser ? "conic-gradient(#ff4d4d,#46d36b,#4c7cff,#ff4d4d)" : x.color) : "#2a2a3e";
+      dot.style.opacity = lvl > 0.02 ? 0.35 + 0.65 * lvl : 1;
+      dot.style.boxShadow = lvl > 0.02 ? `0 0 ${6 + 16 * lvl}px ${laser ? "#9a5bff" : x.color}` : "none";
+      lamp.style.background = lvl > 0.02 ? `radial-gradient(${laser ? "#9a5bff" : x.color}44, transparent 70%)` : "none";
+      const m = el.querySelector(".meter i");
+      m.style.width = `${Math.round(lvl * 100)}%`; m.style.background = laser ? "#9a5bff" : x.color;
+      const kv = el.querySelector(".kv"); kv.innerHTML = "";
+      if (x.muted) { const s = document.createElement("span"); s.className = "stop"; s.textContent = "STOP – zhasnuté"; kv.append(s); }
+      else if (on) {
+        const i = x.info;
+        if (x.type !== "laser" && x.type !== "fog") kv.append(chip("jas", `${x.dimmer ?? Math.round(x.level * 100)} %`));
+        if (i.pan != null) kv.append(chip("pan", i.pan));
+        if (i.tilt != null) kv.append(chip("tilt", i.tilt));
+        if (i.gobo != null) kv.append(chip("gobo", i.gobo));
+        if (i.derby != null) kv.append(chip("derby", i.derby ? "točí" : "–"));
+        if (i.laser != null) kv.append(chip("laser", i.laser ? "zap" : "vyp"));
+        if (i.uv != null) kv.append(chip("UV", i.uv ? `${Math.round(i.uv / 2.55)} %` : "–"));
+        if (i.strobo != null && i.strobo) kv.append(chip("strobo", "áno"));
+        if (i.dym != null) kv.append(chip("dym", i.dym ? "fúka" : "–"));
+        if (!x.active) kv.append(chip("", "nesvieti"));
+      }
+      const b = el.querySelector(".pp2");
+      b.className = "pp2" + (x.muted ? " play" : "");
+      b.textContent = x.muted ? "▶ PLAY" : "■ STOP";
+      b.setAttribute("aria-label", `${x.muted ? "Zapnúť" : "Zastaviť"} ${x.name}`);
+    }
+    for (const id of Object.keys(cards)) if (!seen.has(id)) { cards[id].el.remove(); delete cards[id]; }
+  }
+  async function tick() {
+    clearTimeout(timer);
+    if (!busy && !document.hidden) {
+      busy = true;
+      try { const r = await fetch("/api/rig/live"); if (r.ok) render((await r.json()).fixtures); } catch { /* offline */ }
+      busy = false;
+    }
+    timer = setTimeout(tick, on ? 300 : 10000);      // vypnuté naživo: len stav PLAY/STOP raz za 10 s
+  }
+  function setOn(v) {
+    on = v; sec.classList.toggle("idle", !on);
+    $("#lv-hint").hidden = false;
+    try { localStorage.setItem("dmxLive", on ? "1" : "0"); } catch { /* nič */ }
+    tick();
+  }
+  sw.addEventListener("change", () => setOn(sw.checked));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+  setOn(on);
+}

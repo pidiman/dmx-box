@@ -274,3 +274,38 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .menu-st .bt-ad-note { font-size: 11px; color: var(--muted); line-height: 1.35; }
 .menu-st .bt-ad-note.warn { color: var(--warn); }
 .menu-st b.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; max-width: none; }
+
+/* Svetlá – DMX výstup (karty s PLAY/STOP) */
+.lv h2 { display: flex; align-items: center; gap: 8px; }
+.lv-sw { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none;
+  letter-spacing: 0; font-size: 13px; color: var(--text); font-weight: 600; }
+.lv-sw input { position: absolute; opacity: 0; pointer-events: none; }
+.lv-sw .sw { position: relative; width: 38px; height: 22px; border-radius: 11px; background: #2e2e44; transition: background .2s; }
+.lv-sw .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: transform .2s; }
+.lv-sw input:checked + .sw { background: var(--ok); }
+.lv-sw input:checked + .sw::after { transform: translateX(16px); }
+.lv-sw input:focus-visible + .sw { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.lv-hint { margin: -2px 0 10px; font-size: 12px; color: var(--muted); }
+.lv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.lvc { background: var(--panel); border: 1px solid #22223a; border-radius: 14px; padding: 12px;
+  display: grid; grid-template-columns: 54px 1fr auto; gap: 10px 12px; align-items: center; }
+.lvc .lamp { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; }
+.lvc .lamp i { width: 26px; height: 26px; border-radius: 50%; background: #2a2a3e; transition: background .15s, box-shadow .15s, opacity .15s; }
+.lvc .nm { min-width: 0; }
+.lvc .nm b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lvc .nm small { font-size: 11px; color: var(--muted); }
+.lvc .pp2 { height: 38px; min-width: 84px; padding: 0 12px; border-radius: 11px; font: 700 13px system-ui, sans-serif;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+  background: #1d1d2c; border: 1px solid #2e2e44; color: var(--text); }
+.lvc .pp2.play { background: var(--ok); border-color: var(--ok); color: #04130a; }
+.lvc .pp2:active { transform: scale(.95); }
+.lvc .kv { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; min-height: 21px; }
+.lvc .kv span { font-size: 11px; background: #0b0b12; border: 1px solid #2a2a3e; border-radius: 6px; padding: 2px 6px; color: #c7c7d6;
+  font-variant-numeric: tabular-nums; }
+.lvc .kv span em { font-style: normal; color: var(--muted); margin-right: 3px; }
+.lvc .kv span.stop { background: #3a1616; border-color: #ff6b6b; color: #ffb3b3; }
+.lvc .meter { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #22223a; overflow: hidden; }
+.lvc .meter i { display: block; height: 100%; width: 0; transition: width .15s; }
+.lvc.muted .lamp, .lvc.muted .nm, .lvc.muted .meter { opacity: .45; }
+.lv.idle .lvc .lamp i, .lv.idle .lvc .meter i { opacity: .35; }

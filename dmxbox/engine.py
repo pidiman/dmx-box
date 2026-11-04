@@ -62,6 +62,8 @@ class Engine(threading.Thread):
         self._drop_count = 0
         self.identify: tuple | None = None      # (Fixture, do kedy) – svetlo bliká na bielo
         self.test: tuple | None = None          # (Fixture, {kanál: hodnota}, do kedy) – test kanálov z appky
+        self.muted: set[str] = set()            # STOP z Ovládania: tieto svetlá nesvietia (len do reštartu)
+        self.last_look: Look | None = None
         self._drop_beat = -1e9      # beat, kedy začal posledný drop
 
     def stop(self) -> None:
@@ -136,12 +138,25 @@ class Engine(threading.Thread):
         laser_on = fs.laser and not self.status.idle and section != "breakdown" and s.master > 0.05
         self._write_generic(frame, L, s.master, strobe=s.strobe or drop_strobe, fog_on=fog_on, laser_on=laser_on)
         self._write_fog(frame, L, fog_on, s.master)
+        self._mute(frame)
+        self.last_look = L
         if s.blackout:
             frame = self.rig.new_frame()
             self._write_safe_defaults(frame)
         frame = self._overrides(frame, now)
         self.status.frame += 1
         return frame
+
+    KEEP_ON_MUTE = ("pan", "tilt", "pan_fine", "tilt_fine", "pt_speed")   # hlava ostane mieriť, len zhasne
+
+    def _mute(self, frame: bytearray) -> None:
+        for key in self.muted:
+            fx = self.rig.fx.get(key)
+            if fx is None:
+                continue
+            for ch, fn in fx.fns.items():
+                if fn not in self.KEEP_ON_MUTE:
+                    fx.set(frame, ch, 0)
 
     # --- identifikácia a test kanálov (správa svetiel) ---------------------------------------
     def _overrides(self, frame: bytearray, now: float) -> bytearray:
