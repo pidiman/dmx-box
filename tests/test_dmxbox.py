@@ -1167,3 +1167,22 @@ def test_rig_live_and_mute(tmp_path):
     c.post("/api/rig/mute/parbar", json={"on": False})
     assert "parbar" not in box.engine.muted
     assert c.post("/api/rig/mute/nic", json={"on": True}).status_code == 404
+
+
+def test_frame_size_follows_rig(tmp_path):
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.fixtures import ROOT, RigStore, frame_size
+    assert frame_size(0) == 8 and frame_size(36) == 40 and frame_size(46) == 48 and frame_size(600) == 512
+    box = _box(tmp_path)
+    box.rig_store = RigStore(tmp_path / "rig.yaml", ROOT / "rig.default.yaml")
+    c = TestClient(create_app(box))
+    st = c.get("/api/rig").json()
+    assert st["usb_hint"] == 40 and "dongle_limit" not in st
+    ents = st["fixtures"]
+    last = max((e for e in ents if e["enabled"]), key=lambda e: e["end"])
+    r = c.put(f"/api/rig/fixture/{last['id']}", json={"address": 60})
+    assert r.status_code == 200, r.text
+    end = 60 + last["footprint"] - 1
+    assert box.out.channels == frame_size(end) and r.json()["frame"] == frame_size(end)
+    assert "512" in (r.json().get("warning") or "")

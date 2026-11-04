@@ -66,7 +66,8 @@ function renderMap() {
   }
   const lg = $("#legend"); lg.innerHTML = "";
   for (const m of rig.map) lg.append(h("span", { class: "tag-l" }, h("i", { style: `background:${color(m.id)}` }), `${m.label} ${m.from}–${m.to}${m.enabled ? "" : " (vypnuté)"}`));
-  if (rig.dongle_limit) lg.append(h("span", { class: "tag-l", title: "Lacný USB-DMX dongle spoľahlivo zvláda asi toľko kanálov" }, `limit donglu ~${rig.dongle_limit}`));
+  if (rig.frame) lg.append(h("span", { class: "tag-l", title: "Box posiela kanály 1 až po posledné zapnuté svetlo (zaokrúhlené na 8)" }, `posiela sa 1–${rig.frame}`));
+  if (rig.usb_hint) lg.append(h("span", { class: "tag-l", title: "Dongle zvládne 512 kanálov. Na Raspberry Pi 3 je ale každý meniaci sa kanál navyše ďalší USB prenos – pod touto hranicou beží USB najľahšie." }, `odporúčané do ~${rig.usb_hint} (USB Pi 3)`));
 }
 
 function renderBanners(extra) {

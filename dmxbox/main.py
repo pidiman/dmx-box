@@ -76,7 +76,7 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
                         bpm_min=ac["bpm_min"], bpm_max=ac["bpm_max"],
                         silence_seconds=ac["silence_seconds"], realtime=simulated)
     out = DMXOut(driver="dry" if dry else dc["driver"], fps=dc["fps"],
-                 channels=min(dc["channels"], rig.universe_channels) or dc["channels"],
+                 channels=rig.universe_channels,          # podľa svetiel, nie pevné číslo
                  chunk=dc["chunk"], delay_ms=cfg["output"]["light_delay_ms"])
     store = Store(resolve(cfg["presets_file"]),
                   Settings(light_delay_ms=cfg["output"]["light_delay_ms"]))

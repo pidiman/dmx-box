@@ -570,7 +570,7 @@ def create_app(box) -> FastAPI:
 
     # --- správa svetiel (Nastavenia boxu → Svetlá) -------------------------------------
     rig_store = getattr(box, "rig_store", None)
-    dongle_limit = box.out.channels
+    USB_HINT = 40      # odporúčanie, nie limit: uDMX zvláda 512, ale na Pi 3 viac meniacich sa kanálov = viac USB prenosov
 
     def rig_state(extra: dict | None = None) -> dict:
         profiles = fxlib.load_profiles()
@@ -586,7 +586,8 @@ def create_app(box) -> FastAPI:
             fixtures.append({**e, "enabled": e.get("enabled", True), "footprint": n, "end": a + n - 1,
                              "model": prof.get("name", e.get("profile")), "type": prof.get("type", "other")})
         return {"fixtures": fixtures, "map": fxlib.channel_map(entries, profiles),
-                "errors": fxlib.validate(entries, profiles), "dongle_limit": dongle_limit,
+                "errors": fxlib.validate(entries, profiles), "usb_hint": USB_HINT,
+                "frame": box.out.channels,
                 "profiles": [{"id": p["id"], "name": p["name"], "type": p.get("type", "other"),
                               "user": p.get("user", False), "notes": p.get("notes", ""),
                               "modes": {m: [{"name": c["name"], "fn": c.get("fn", "other"), "value": c.get("value")}
@@ -608,11 +609,11 @@ def create_app(box) -> FastAPI:
         box.engine.rig = rig
         warn = None
         end = max((f.start + f.footprint - 1 for f in rig.fx.values()), default=0)
-        if end > box.out.channels:
-            box.out.channels = min(512, -(-end // 8) * 8)
-        if end > dongle_limit:
-            warn = (f"Svetlá siahajú po kanál {end}. Lacný USB-DMX dongle (uDMX) spoľahlivo zvláda asi "
-                    f"{dongle_limit} kanálov – ak by svetlá blikali alebo zamŕzali, posuň adresy nižšie.")
+        box.out.channels = rig.universe_channels         # rámec rastie aj sa zmenšuje podľa svetiel
+        if end > USB_HINT:
+            warn = (f"Svetlá siahajú po kanál {end}. Dongle zvládne celých 512 kanálov, ale na Raspberry Pi 3 "
+                    f"každý meniaci sa kanál navyše znamená viac USB prenosov. Ak by svetlá blikali alebo "
+                    f"zamŕzali, posuň adresy nižšie alebo vypni svetlá, ktoré nemáš zapojené.")
         return rig_state({"warning": warn})
 
     def clean(body: dict, existing: dict | None = None) -> dict:

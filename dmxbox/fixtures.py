@@ -194,6 +194,11 @@ class Fixture:
         return [n for n, f in self.fns.items() if f == fn]
 
 
+def frame_size(end: int) -> int:
+    """Koľko kanálov posielať: po posledný použitý, zaokrúhlené hore na 8, 8–512."""
+    return max(8, min(512, -(-end // 8) * 8))
+
+
 class Rig:
     """Zapnuté svetlá + spoločný DMX rámec."""
 
@@ -360,7 +365,8 @@ class RigStore:
             if e["enabled"]:
                 fixtures[e["id"]] = build_fixture(e, profiles)
         end = max((f.start + f.footprint - 1 for f in fixtures.values()), default=0)
-        return Rig(fixtures, max(self.universe_channels, -(-end // 8) * 8), entries)
+        # rámec končí posledným zapnutým svetlom (zaokrúhlené na 8 = jeden USB prenos uDMX)
+        return Rig(fixtures, frame_size(end), entries)
 
 
 def load_rig(path: str | Path = "rig.yaml") -> Rig:
