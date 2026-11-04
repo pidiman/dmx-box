@@ -1120,5 +1120,5 @@ def test_moving_head_floor_mount(tmp_path):
     assert h.aim("pan", 0.2) == 255 - h.aim("pan", 0.8) or abs(h.aim("pan", 0.2) - (255 - h.aim("pan", 0.8))) <= 1
     lo, hi = h.FLOOR_TILT                       # na zemi: pás okolo zvislice, nie limity zavesenej hlavy
     assert h.aim("tilt", 0.0) == hi and h.aim("tilt", 1.0) == lo
-    assert abs(h.aim("tilt", 0.5) - 140) <= 1
+    assert abs(h.aim("tilt", 0.5) - 177) <= 1
     assert c.get("/api/fixtures").json()["movinghead"]["mount"] == "floor"
