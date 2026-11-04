@@ -47,6 +47,21 @@ const FX_INFO = {
   },
 };
 
+// legenda riadku tempa (AUTO, takty, ½×, 2×, TAP, A)
+FX_INFO.tempo = {
+  title: "Tempo a AUTO – čo robia tlačidlá",
+  intro: "Riadok pod kolesami určuje, <b>kedy sa efekty striedajú</b> a <b>v akom tempe</b> svetlá bežia. BPM (údery za minútu) box meria z hudby sám – ½×, 2×, TAP a A slúžia na opravu, keď sa pomýli.",
+  names: { auto: "AUTO", bars: "8 / 16 / 32 taktov", half: "½×", double: "2×", tap: "TAP", a: "A" },
+  items: {
+    auto: ["Box sám strieda efekty na kolesách Farby a Pohyb podľa štýlu hudby a časti skladby (drop, breakdown…). Ťuk na konkrétny efekt na kolese AUTO vypne – svieti len ten efekt. Ťuk na AUTO ho zapne späť.", ["zapnuté = bežná prevádzka"]],
+    bars: ["Ako často AUTO mení efekty. Pri 128 BPM je 8 taktov ≈ 15 s (rýchle striedanie), 16 ≈ 30 s, 32 ≈ 1 min (pokojné).", ["8 = párty", "16 = predvolené", "32 = chill"]],
+    half: ["Box nameral dvojnásobné tempo (napr. 170 namiesto 85) a svetlá blikajú prirýchlo. Vydelí BPM dvomi a podrží ho ručne.", ["prirýchle blikanie"]],
+    double: ["Box nameral polovičné tempo (napr. 64 namiesto 128) a svetlá sú lenivé. Zdvojnásobí BPM a podrží ho ručne.", ["pomalé, mimo rytmu"]],
+    tap: ["Ťukaj do rytmu aspoň 3×: z odstupov sa vypočíta BPM a každý ťuk zarovná dobu. Pauza dlhšia ako 2 s začne počítanie odznova. BPM potom zostane ručné.", ["živá hudba", "box nevie chytiť rytmus"]],
+    a: ["Zruší ručné BPM (½×, 2×, TAP) a vráti automatické meranie z hudby. Použi pri ďalšej skladbe.", ["nová skladba"]],
+  },
+};
+
 const SECTION_NAMES = { main: "hrá", breakdown: "breakdown", build: "build-up", drop: "DROP" };
 let styleNames = {};
 
@@ -274,12 +289,12 @@ function sysStats(st) {
 // --- legenda kolies (i) -------------------------------------------------------
 let infoOpen = null, lastFx = { color: null, move: null };
 function renderInfo() {
-  const w = infoOpen, info = FX_INFO[w], cur = lastFx[w];
+  const w = infoOpen, info = FX_INFO[w], cur = w === "tempo" ? (settings.auto ? "auto" : null) : lastFx[w];
   const list = $("#sh-list"); list.innerHTML = "";
   for (const [k, [desc, when]] of Object.entries(info.items)) {
     const li = document.createElement("li");
     if (k === cur) li.className = "on";
-    li.innerHTML = `<span class="sw"></span><b>${NAMES[k] || k}${k === cur ? "<em>PRÁVE BEŽÍ</em>" : ""}</b><p></p><div class="when"></div>`;
+    li.innerHTML = `<span class="sw"></span><b>${(info.names && info.names[k]) || NAMES[k] || k}${k === cur ? `<em>${w === "tempo" ? "ZAPNUTÉ" : "PRÁVE BEŽÍ"}</em>` : ""}</b><p></p><div class="when"></div>`;
     li.querySelector("p").textContent = desc;
     for (const t of when) { const sp = document.createElement("span"); sp.textContent = t; li.querySelector(".when").append(sp); }
     list.append(li);
@@ -290,6 +305,7 @@ function openInfo(w, btn) {
   infoOpen = w; infoReturn = btn;
   const sheet = $("#info-sheet .sheet");
   sheet.classList.toggle("move", w === "move");
+  sheet.classList.toggle("tempo", w === "tempo");
   $("#sh-title").textContent = FX_INFO[w].title;
   $("#sh-intro").innerHTML = FX_INFO[w].intro;
   renderInfo();

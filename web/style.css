@@ -196,6 +196,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
   overscroll-behavior: contain; background: #12121c; border: 1px solid var(--line); border-radius: 18px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, .6); }
 .sheet.move { --c: var(--accent2); --cbg: #0d2630; }
+.sheet.tempo { --c: #f5b942; --cbg: #2a2210; }
+.info-btn.inline { position: static; margin-left: auto; flex: none; }
 .sheet header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px;
   padding: 16px 18px 12px; background: #12121c; border-bottom: 1px solid var(--line); }
 .sheet header h3 { margin: 0; font-size: 18px; }
