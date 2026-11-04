@@ -124,13 +124,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 /* vizualizácia hudby pod hornou lištou */
 .spectrum { max-width: 980px; margin: 0 auto; padding: 10px 16px 6px; display: grid; gap: 4px; border-bottom: 1px solid var(--line); }
 .top .bpm { min-width: auto; flex: none; }
-.top .track { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.top .track[hidden] { display: none; }
-.top .track svg { flex: none; color: var(--accent2); }
-.top .track .tt { display: grid; min-width: 0; line-height: 1.2; }
-.top .track strong, .top .track .tt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.top .track strong { font-size: 15px; font-weight: 600; }
-.top .track .tt span { font-size: 12px; color: var(--muted); }
 .top .status { flex: none; }
 @media (max-width: 520px) { .top { gap: 10px; } }
 .top .status { position: relative; align-items: center; gap: 10px; }
@@ -230,38 +223,43 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .sw-row input:checked + .sw::after { transform: translateX(16px); }
 .sw-row input:focus-visible + .sw { outline: 2px solid var(--accent2); outline-offset: 2px; }
 
-/* prehrávač pod hlavičkou */
-.pbar { position: sticky; top: var(--top-h, 64px); z-index: 4; display: flex; align-items: center; gap: 14px;
-  padding: 10px 16px; background: linear-gradient(90deg, #1a1024, #101a26); border-bottom: 1px solid var(--line); }
-.pbar[hidden] { display: none; }
-.pbar .src { display: grid; line-height: 1.25; min-width: 0; flex: 1; }
-.pbar .src small { font-size: 11px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pbar .src b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pbar button { height: 46px; min-width: 46px; padding: 0 12px; border-radius: 14px; display: inline-flex; align-items: center;
-  justify-content: center; gap: 8px; background: #1d1d2c; border: 1px solid #2e2e44; color: var(--text);
-  font: 600 14px system-ui, sans-serif; cursor: pointer; }
-.pbar button:active { transform: scale(.96); }
-.pbar button.pp { background: var(--accent); border-color: var(--accent); color: #fff; padding: 0 18px; min-width: 120px; }
-.pbar button.pp.mute { background: #1d1d2c; border-color: #2e2e44; }
-.pbar button.pp.mute.on { background: #3a1616; border-color: #ff6b6b; color: #ffb3b3; }
-.pbar .ic { display: grid; place-items: center; }
-.pbar .vol { display: flex; align-items: center; gap: 8px; }
-.pbar .vol .spk { color: var(--muted); flex: none; }
-.pbar .vol output { min-width: 46px; font: 600 14px system-ui, sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
-.pbar input[type=range] { -webkit-appearance: none; appearance: none; width: 150px; height: 8px; border-radius: 4px; margin: 0;
+/* hlavička: karta „práve hrá“ + hlasitosť (všetko v jednom riadku) */
+.top .np { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 5px 12px 5px 5px;
+  background: #171722; border: 1px solid #2a2a3e; border-radius: 14px; }
+.top .np[hidden], .top .volc[hidden], .top .np .pp[hidden], .top .chip[hidden] { display: none; }
+.top .np:has(.pp[hidden]) { padding-left: 12px; }
+.top .np .tt { display: grid; min-width: 0; flex: 1; line-height: 1.2; }
+.top .np .tt strong, .top .np .tt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .np .tt strong { font-size: 15px; font-weight: 600; }
+.top .np .tt span { font-size: 12px; color: var(--muted); }
+.top .np .chips { display: flex; gap: 6px; flex: none; }
+.top .chip { font-size: 11px; color: #c7c7d6; background: #1d1d2c; border: 1px solid #2e2e44; border-radius: 999px;
+  padding: 3px 9px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.top button.pp { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); border: 1px solid var(--accent); color: #fff; cursor: pointer; }
+.top button.pp .ic { display: grid; place-items: center; }
+.top button.pp.mute { background: #1d1d2c; border-color: #2e2e44; }
+.top button.pp.mute.on { background: #3a1616; border-color: #ff6b6b; color: #ffb3b3; }
+.top button.pp:active, .top .volc button:active { transform: scale(.94); }
+.top .volc { flex: none; display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 5px;
+  background: #171722; border: 1px solid #2a2a3e; border-radius: 14px; }
+.top .volc button { width: 34px; height: 34px; padding: 0; border-radius: 10px; display: grid; place-items: center;
+  background: #1d1d2c; border: 1px solid #2e2e44; color: var(--text); cursor: pointer; }
+.top .volc output { min-width: 42px; font: 600 14px system-ui, sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
+.top .volc input[type=range] { -webkit-appearance: none; appearance: none; width: 110px; height: 8px; border-radius: 4px; margin: 0;
   background: linear-gradient(90deg, var(--accent2), var(--accent)) 0 / var(--v, 50%) 100% no-repeat, #262638; }
-.pbar input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; }
-.pbar input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; }
-.pbar.muted input[type=range] { filter: grayscale(1) brightness(.7); }
+.top .volc input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; }
+.top .volc input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 0; }
+.top .volc.muted input[type=range] { filter: grayscale(1) brightness(.7); }
+@media (max-width: 1180px) { .top .np .chips { display: none; } }
+@media (max-width: 900px) { .top .volc output { display: none; } .top .volc input[type=range] { width: 80px; } }
 @media (max-width: 640px) {
-  .pbar { flex-wrap: wrap; gap: 8px; }
-  .pbar .src { flex-basis: 100%; }
-  .pbar button.pp { min-width: 56px; padding: 0 14px; }
-  .pbar button .t { display: none; }
-  .pbar .vol { flex: 1; }
-  .pbar input[type=range] { flex: 1; width: auto; min-width: 60px; }
-  .pbar .vol .spk { display: none; }
+  .top { flex-wrap: wrap; row-gap: 8px; }
+  .top .status { margin-left: auto; order: 2; }
+  .top .np { order: 3; flex-basis: 100%; }
+  .top .volc { order: 4; flex: 1; }
+  .top .volc input[type=range] { flex: 1; width: auto; }
+  .top .volc output { display: block; }
 }
 
 /* prepínač BT adaptéra v menu */

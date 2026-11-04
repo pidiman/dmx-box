@@ -187,13 +187,6 @@ function live(d) {
   $("#beat").style.opacity = a.silent ? 0.15 : Math.max(0.15, 1 - a.phase * 1.6);
   if (d.viz) { spec.l = d.viz.l.map((v) => v / 99); spec.r = d.viz.r.map((v) => v / 99); }
   spec.silent = a.silent;
-  const tr = d.track, tb = $("#track");
-  const showTrack = !!(tr && tr.title);
-  tb.hidden = !showTrack;
-  if (showTrack) {
-    $("#track-title").textContent = tr.title;
-    $("#track-artist").textContent = [tr.artist, tr.source && `· ${tr.source}`].filter(Boolean).join(" ");
-  }
   sysStats(d.sys);
   speakerState(d.speaker);
   airKeepState(d.airkeep);
@@ -274,7 +267,7 @@ function sysStats(st) {
   const box = $("#sysg"), menu = $("#menu-sys");
   box.hidden = menu.hidden = !st;
   if (!st) return;
-  for (const k of ["cpu", "ram", "sd"]) {
+  for (const k of ["cpu", "ram"]) {
     const v = st[k], g = box.querySelector(`[data-k="${k}"]`);
     g.className = "g " + lvl(v, 60, 85);
     g.querySelector(".fg").style.strokeDasharray = `${(RING * (v ?? 0)) / 100} ${RING}`;
@@ -364,22 +357,34 @@ function pbSetVol(v) {
   r.style.setProperty("--v", `${r.value}%`);
   $("#pb-volout").textContent = `${r.value} %`;
 }
+// hlavička: karta „práve hrá“ (play/pauza + skladba + zdroj → výstup) a hlasitosť
+let npTr = null;
 function playerState(p, tr) {
-  const bar = $("#pbar");
-  bar.hidden = !(p && p.available);
-  if (bar.hidden) return;
-  pbLast = p;
-  const from = p.source ? [p.source_name, p.device].filter(Boolean).join(" · ") : "Nič nehrá";
-  $("#pb-route").textContent = p.output ? `${from} → ${p.output}` : from;
-  const title = tr && tr.title ? [tr.artist, tr.title].filter(Boolean).join(" – ") : (p.source ? p.source_name : "Pusti hudbu z mobilu alebo iPadu");
-  $("#pb-title").textContent = title;
+  if (tr !== undefined) npTr = tr; else tr = npTr;     // pbPost nepozná skladbu – drž poslednú
+  const np = $("#np"), vc = $("#volc");
+  const ok = !!(p && p.available), hasTr = !!(tr && tr.title);
+  np.hidden = !(ok || hasTr);
+  vc.hidden = !ok;
+  if (np.hidden) return;
+  if (ok) pbLast = p;
+  const title = hasTr ? tr.title : (ok && p.source ? p.source_name : "Nič nehrá");
+  const artist = hasTr ? (tr.artist || "") : (ok && !p.source ? "Pusti hudbu z mobilu alebo iPadu" : "");
+  $("#np-title").textContent = title;
+  $("#np-artist").textContent = artist;
+  np.title = [artist, title].filter(Boolean).join(" – ");
+  const src = ok ? [p.source_name, p.device].filter(Boolean).join(" · ") : (tr && tr.source) || "";
+  const s1 = $("#np-src"), s2 = $("#np-out");
+  s1.textContent = src; s1.hidden = !src;
+  s2.textContent = ok && p.output ? `🔊 ${p.output}` : ""; s2.hidden = !(ok && p.output);
   const pp = $("#pb-pp");
+  pp.hidden = !ok;
+  if (!ok) return;
   let ic, txt;
   if (p.can_pause) { ic = p.playing ? "pause" : "play"; txt = p.playing ? "Pauza" : "Play"; pp.className = "pp"; }
   else { ic = p.muted ? "mute" : "sound"; txt = p.muted ? "Zapnúť zvuk" : "Stlmiť"; pp.className = "pp mute" + (p.muted ? " on" : ""); }
   if (pp.dataset.ic !== ic) { $("#pb-ic").innerHTML = PB_IC[ic]; pp.dataset.ic = ic; }
-  $("#pb-t").textContent = txt; pp.setAttribute("aria-label", txt);
-  bar.classList.toggle("muted", !!p.muted);
+  pp.setAttribute("aria-label", txt); pp.title = txt;
+  vc.classList.toggle("muted", !!p.muted);
   pbSetVol(p.volume);
 }
 async function pbPost(path, body) {
@@ -387,7 +392,7 @@ async function pbPost(path, body) {
     const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || r.statusText);
-    if (d.result) playerState(d.result, null);
+    if (d.result) playerState(d.result);
     if (d.fallback === "mute") toast("Zdroj sa nedá ovládať z boxu – stlmil som zvuk boxu");
   } catch (e) { toast("Nepodarilo sa: " + e.message); }
 }
@@ -396,12 +401,6 @@ $("#pb-minus").addEventListener("click", () => pbPost("/api/player/volume", { st
 $("#pb-plus").addEventListener("click", () => pbPost("/api/player/volume", { step: 5 }));
 $("#pb-vol").addEventListener("input", (e) => { pbHold = Date.now() + 2500; pbSetVol(+e.target.value); });
 $("#pb-vol").addEventListener("change", (e) => { pbHold = Date.now() + 2500; pbPost("/api/player/volume", { value: +e.target.value }); });
-// prehrávač sa lepí pod hlavičku – zisti jej výšku
-{
-  const top = document.querySelector("header.top");
-  const setH = () => document.documentElement.style.setProperty("--top-h", `${top.offsetHeight}px`);
-  setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(top);
-}
 
 // --- Bluetooth adaptér: vstavaný / USB dongle (zmena = reštart boxu) ---------------------------
 const BT_NAMES = { builtin: "vstavaný", dongle: "USB dongle" };
