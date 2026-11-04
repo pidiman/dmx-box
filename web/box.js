@@ -190,6 +190,8 @@ function renderSys() {
     const okPower = !s.throttled || s.throttled === "0x0";
     g.append(item(lbl("Teplota a napájanie", `${s.temp || "?"} · ${okPower ? "napájanie OK" : "slabý zdroj (" + s.throttled + ")"}`, okPower ? "ok" : "")));
   }
+  g.append(item(lbl("Vymazať cache appky", "na tomto zariadení: stiahne najnovšiu verziu appky (PIN a nastavenia boxu ostanú)"),
+    h("button", { onclick: clearAppCache }, "Vymazať")));
   g.append(item(lbl("Aktualizovať z GitHubu", "stiahne novú verziu a reštartuje appku (treba internet)"),
     h("button", { disabled: !!busy.up, onclick: () => act("up", () => api("POST", "/api/system/update"), (r) => `Hotovo: ${r.result}`) }, busy.up ? spin("…") : "Aktualizovať")));
   g.append(item(lbl("Reštartovať appku", "pri zaseknutých svetlách"),
@@ -238,6 +240,18 @@ function renderLog() {
   }
   g.append(item(lbl("Všetky záznamy", "ZIP na poslanie na analýzu"),
     h("a", { class: "pill", href: "/api/log/download-all", download: "dmxbox-zaznam.zip" }, "Stiahnuť ZIP")));
+}
+
+// vymaže offline cache (service worker) len v tomto prehliadači a načíta appku nanovo
+async function clearAppCache() {
+  try {
+    if ("serviceWorker" in navigator) {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    }
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+    toast("Cache vymazaná – načítavam appku nanovo…");
+  } catch (e) { toast("Nepodarilo sa: " + e.message); return; }
+  setTimeout(() => location.replace(location.pathname + "?v=" + Date.now()), 600);
 }
 
 // --- PIN ochrana ------------------------------------------------------------------------
