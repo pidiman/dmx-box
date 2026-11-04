@@ -1155,6 +1155,11 @@ def test_rig_live_and_mute(tmp_path):
     pb, h = box.engine.rig["parbar"], box.engine.rig["movinghead"]
     assert all(f[pb.start - 1 + i] == 0 for i in range(pb.footprint))
     assert f[h.addr("dimmer") - 1] == 0 and f[h.addr("tilt") - 1] > 0
+    held = (f[h.addr("pan") - 1], f[h.addr("tilt") - 1])
+    box.store.update(move_fx="snap")                   # aj keď sa efekt hýbe, hlava stojí
+    for k in range(1, 6):
+        f2 = box.engine.compute(box.analyzer.snapshot(), _t.monotonic() + k * 0.7)
+        assert (f2[h.addr("pan") - 1], f2[h.addr("tilt") - 1]) == held
     box.out.last = bytes(f)
     live = {x["id"]: x for x in c.get("/api/rig/live").json()["fixtures"]}
     assert live["parbar"]["muted"] and not live["parbar"]["active"] and live["parbar"]["level"] == 0

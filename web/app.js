@@ -563,7 +563,7 @@ init().catch(err);
           headers: { "content-type": "application/json" }, body: JSON.stringify({ on: !cur }) });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
         render((await r.json()).fixtures);
-        toast(cur ? `${x.name}: PLAY – späť v show` : `${x.name}: STOP – zhasnuté`);
+        toast(cur ? `${x.name}: PLAY – späť v show` : `${x.name}: STOP – zhasnuté a zastavené`);
       } catch (e) { toast("Nepodarilo sa: " + e.message); }
     });
     grid.append(el);
@@ -587,7 +587,7 @@ init().catch(err);
       const m = el.querySelector(".meter i");
       m.style.width = `${Math.round(lvl * 100)}%`; m.style.background = laser ? "#9a5bff" : x.color;
       const kv = el.querySelector(".kv"); kv.innerHTML = "";
-      if (x.muted) { const s = document.createElement("span"); s.className = "stop"; s.textContent = "STOP – zhasnuté"; kv.append(s); }
+      if (x.muted) { const s = document.createElement("span"); s.className = "stop"; s.textContent = "STOP – zhasnuté, stojí"; kv.append(s); }
       else if (on) {
         const i = x.info;
         if (x.type !== "laser" && x.type !== "fog") kv.append(chip("jas", `${x.dimmer ?? Math.round(x.level * 100)} %`));

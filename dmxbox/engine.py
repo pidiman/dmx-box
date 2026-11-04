@@ -62,8 +62,9 @@ class Engine(threading.Thread):
         self._drop_count = 0
         self.identify: tuple | None = None      # (Fixture, do kedy) – svetlo bliká na bielo
         self.test: tuple | None = None          # (Fixture, {kanál: hodnota}, do kedy) – test kanálov z appky
-        self.muted: set[str] = set()            # STOP z Ovládania: tieto svetlá nesvietia (len do reštartu)
+        self.muted: dict[str, dict[str, int]] = {}   # STOP z Ovládania: svetlo → zamrznuté pan/tilt (do reštartu)
         self.last_look: Look | None = None
+        self.last_computed = bytes(512)
         self._drop_beat = -1e9      # beat, kedy začal posledný drop
 
     def stop(self) -> None:
@@ -144,19 +145,36 @@ class Engine(threading.Thread):
             frame = self.rig.new_frame()
             self._write_safe_defaults(frame)
         frame = self._overrides(frame, now)
+        self.last_computed = bytes(frame)
         self.status.frame += 1
         return frame
 
-    KEEP_ON_MUTE = ("pan", "tilt", "pan_fine", "tilt_fine", "pt_speed")   # hlava ostane mieriť, len zhasne
+    HOLD_ON_MUTE = ("pan", "tilt", "pan_fine", "tilt_fine", "pt_speed")
+
+    def mute(self, key: str, on: bool) -> None:
+        """STOP: svetlo zhasne a hlava zamrzne tam, kde práve je (pan/tilt sa už nemenia).
+        DMX ide vždy celým rámcom, takže „neposielať“ = posielať stále tie isté hodnoty."""
+        if not on:
+            self.muted.pop(key, None)
+            return
+        fx = self.rig.fx.get(key)
+        if fx is None or key in self.muted:
+            return
+        hold = {}
+        for ch, fn in fx.fns.items():
+            if fn in self.HOLD_ON_MUTE:
+                a = fx.addr(ch)
+                if a and a <= len(self.last_computed):
+                    hold[ch] = self.last_computed[a - 1]
+        self.muted[key] = hold
 
     def _mute(self, frame: bytearray) -> None:
-        for key in self.muted:
+        for key, hold in self.muted.items():
             fx = self.rig.fx.get(key)
             if fx is None:
                 continue
-            for ch, fn in fx.fns.items():
-                if fn not in self.KEEP_ON_MUTE:
-                    fx.set(frame, ch, 0)
+            for ch in fx.fns:
+                fx.set(frame, ch, hold.get(ch, 0))
 
     # --- identifikácia a test kanálov (správa svetiel) ---------------------------------------
     def _overrides(self, frame: bytearray, now: float) -> bytearray:

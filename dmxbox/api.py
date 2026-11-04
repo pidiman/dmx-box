@@ -775,7 +775,7 @@ def create_app(box) -> FastAPI:
     def rig_mute(key: str, body: MuteBody):
         if key not in box.engine.rig.fx:
             raise HTTPException(404, "svetlo nenájdené")
-        (box.engine.muted.add if body.on else box.engine.muted.discard)(key)
+        box.engine.mute(key, body.on)
         return rig_live()
 
     @app.post("/api/rig/test-stop")
