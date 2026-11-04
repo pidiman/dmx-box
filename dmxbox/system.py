@@ -347,10 +347,18 @@ def audio_status() -> dict:
     return st
 
 
+OUTPUT_HOOKS: list = []      # zavolá sa po zmene výstupu (strážca BT reproduktora: naháňať ho len pri BT výstupe)
+
+
 def audio_output(sink: str) -> None:
     names = {s["name"] for s in audio_status()["sinks"]}
     if sink not in names:
         raise CmdError("výstup nenájdený")
+    for hook in OUTPUT_HOOKS:
+        try:
+            hook(sink)
+        except Exception:  # noqa: BLE001
+            pass
     run("pactl", "set-default-sink", sink)
     # presunúť aj práve hrajúce streamy – okrem tých vo virtuálnom výstupe AirPlay (ten má ostať stabilný)
     try:

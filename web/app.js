@@ -316,6 +316,7 @@ function speakerState(sp) {
   const b = $("#st-spk");
   if (sp.connected) { b.textContent = sp.name || "pripojený"; b.className = "on"; }
   else if (sp.reconnecting) { b.textContent = `pripájam ${sp.name || ""}…`; b.className = "warn"; }
+  else if (sp.mac && !sp.in_use) { b.textContent = `${sp.name} · nepoužíva sa`; b.className = ""; }
   else if (sp.mac) { b.textContent = sp.paused ? `${sp.name} · odpojený ručne` : `${sp.name} · odpojený`; b.className = "off"; }
   else { b.textContent = "žiadny"; b.className = ""; }
   b.title = b.textContent;

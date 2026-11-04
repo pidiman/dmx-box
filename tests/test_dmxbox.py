@@ -720,6 +720,27 @@ def test_bt_speaker_autoreconnect(tmp_path, monkeypatch):
     assert w2.info()["mac"] is None
 
 
+def test_bt_speaker_not_chased_when_output_is_cable(tmp_path, monkeypatch):
+    import dmxbox.btspeaker as bs
+    monkeypatch.setattr(bs.time, "sleep", lambda s: None)
+    fake = _FakeBT()
+    fake.OUTPUT_HOOKS = []
+    w = bs.SpeakerWatch(tmp_path / "speaker.json", sysmod=fake)
+    assert fake.OUTPUT_HOOKS == [w.output_changed]
+    w.tick()
+    assert w.info()["in_use"]
+    # scenár AirPlay → výstup USB karta: reproduktor vypnutý sa nenaháňa
+    w.output_changed("alsa_output.usb-C-Media.analog-stereo")
+    fake.connected.clear(); fake.sink = "alsa_output.usb"; fake.calls.clear(); w.GRACE_S = 0
+    w.tick(); w.tick()
+    assert not any("connect" in c for c in fake.calls) and not w.info()["reconnecting"]
+    assert w.info()["in_use"] is False
+    # späť na BT výstup → znova sa stráži
+    w.output_changed("bluez_output.AA_BB_CC_DD_EE_FF.1")
+    w.tick(); w.tick()
+    assert any("--timeout" in c for c in fake.calls)
+
+
 def test_bt_speaker_switch_to_other_speaker(tmp_path, monkeypatch):
     import dmxbox.btspeaker as bs
     monkeypatch.setattr(bs.time, "sleep", lambda s: None)

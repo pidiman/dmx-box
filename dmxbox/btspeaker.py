@@ -42,6 +42,9 @@ class SpeakerWatch(threading.Thread):
         self._half_since: float | None = None
         self._wake = threading.Event()
         self.available = sysmod.has("bluetoothctl")
+        hooks = getattr(sysmod, "OUTPUT_HOOKS", None)
+        if isinstance(hooks, list):
+            hooks.append(self.output_changed)
         self._fails, self._next_try = 0, 0.0     # vypnutý reproduktor nenaháňať každých 10 s donekonečna
 
     # --- stav ----------------------------------------------------------------------
@@ -56,7 +59,19 @@ class SpeakerWatch(threading.Thread):
     def info(self) -> dict:
         with self.lock:
             return {"available": self.available, "auto": self.state["auto"], "name": self.state["name"],
-                    "mac": self.state["mac"], "paused": self.state["paused"], **self.live}
+                    "mac": self.state["mac"], "paused": self.state["paused"],
+                    "in_use": self.state["want_output"], **self.live}
+
+    def output_changed(self, sink: str) -> None:
+        """Výstup zvolený v appke/scenári: BT reproduktor sa naháňa len vtedy, keď je výstupom."""
+        bt = sink.startswith("bluez")
+        with self.lock:
+            if self.state["want_output"] != bt:
+                self.state["want_output"] = bt
+                self._save()
+        if not bt:
+            self._drop_since = None
+            self.live["reconnecting"] = False
 
     def set_auto(self, on: bool) -> dict:
         with self.lock:
@@ -258,7 +273,7 @@ class SpeakerWatch(threading.Thread):
         self._half_since = None
         if self.live.get("connected"):
             self.live["connected"] = False
-        if not auto or paused:
+        if not auto or paused or not want:               # výstup nie je BT (kábel/jack) → nenaháňať
             self.live["reconnecting"] = False
             self._drop_since = None
             return
