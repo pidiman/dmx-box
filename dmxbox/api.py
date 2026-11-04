@@ -170,7 +170,11 @@ def create_app(box) -> FastAPI:
                 return JSONResponse({"detail": "zadaj PIN"}, status_code=401)
             nxt = path if path.startswith("/") and not path.startswith("//") else "/"
             return RedirectResponse(f"/lock.html?next={nxt}", status_code=302)
-        return await call_next(request)
+        resp = await call_next(request)
+        if not path.startswith("/api") and path != "/ws":
+            # appka: prehliadač (Safari/PWA) si súbory vždy overí – po git pull žiadny starý style.css
+            resp.headers.setdefault("Cache-Control", "no-cache")
+        return resp
 
     def logged_in(resp: JSONResponse) -> JSONResponse:
         resp.set_cookie(COOKIE, auth.token(), max_age=MAX_AGE, httponly=True, samesite="lax")

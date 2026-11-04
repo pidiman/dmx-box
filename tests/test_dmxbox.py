@@ -1122,3 +1122,12 @@ def test_moving_head_floor_mount(tmp_path):
     assert h.aim("tilt", 0.0) == hi and h.aim("tilt", 1.0) == lo
     assert abs(h.aim("tilt", 0.5) - 177) <= 1
     assert c.get("/api/fixtures").json()["movinghead"]["mount"] == "floor"
+
+
+def test_static_no_cache(tmp_path):
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    c = TestClient(create_app(_box(tmp_path)))
+    r = c.get("/style.css")
+    assert r.status_code == 200 and r.headers.get("cache-control") == "no-cache"
+    assert "no-cache" not in c.get("/api/state").headers.get("cache-control", "")

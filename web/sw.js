@@ -1,5 +1,5 @@
 // Offline shell – API a WebSocket idú vždy na sieť.
-const CACHE = "dmxbox-v34";
+const CACHE = "dmxbox-v35";
 const SHELL = ["/", "start.html", "start.css", "start.js", "box.html", "box.js", "lights.html", "lights.js", "/ovladanie", "index.html",
   "style.css", "app.js", "manifest.json", "icon.svg", "viz.html", "viz.js"];
 
@@ -15,7 +15,9 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.pathname.startsWith("/api") || url.pathname === "/ws") return;
-  e.respondWith(fetch(e.request).then((r) => {
+  // no-cache: vždy over u boxu (inak Safari podá starý súbor z HTTP cache)
+  const req = e.request.mode === "navigate" ? e.request : new Request(e.request, { cache: "no-cache" });
+  e.respondWith(fetch(req).then((r) => {
     const copy = r.clone();
     caches.open(CACHE).then((c) => c.put(e.request, copy));
     return r;
