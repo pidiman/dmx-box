@@ -390,7 +390,7 @@ function frame(ms) {
   drawBelka(t, floor);
   drawGeneric(t, floor);
   g.globalCompositeOperation = "source-over";
-  requestAnimationFrame(frame);
+  if (running) rafId = requestAnimationFrame(frame);
 }
 
 // --- panel DMX kanálov -----------------------------------------------------------
@@ -423,8 +423,11 @@ function updatePanel() {
 document.getElementById("toggle").onclick = () => panel.classList.toggle("hidden");
 
 // --- dáta ---------------------------------------------------------------------
+// Viz beží až po ťuknutí na SPUSTIŤ: dovtedy žiadne spojenie s boxom, žiadne kreslenie.
+let running = false, ws = null, rafId = 0, fxTimer = 0, retry = 0;
 function connect() {
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/dmx`);
+  if (!running) return;
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/dmx`);
   const conn = document.getElementById("conn");
   ws.onopen = () => { conn.textContent = "online"; conn.className = "pill"; };
   ws.onmessage = (m) => {
@@ -435,10 +438,13 @@ function connect() {
       : `${Math.round(bpm)} BPM · ${d.style || ""}${d.section && d.section !== "main" ? " · " + d.section.toUpperCase() : ""}`;
     updatePanel();
   };
-  ws.onclose = () => { conn.textContent = "offline"; conn.className = "pill off"; setTimeout(connect, 1500); };
+  ws.onclose = () => {
+    conn.textContent = running ? "offline" : "zastavené"; conn.className = "pill off";
+    if (running) retry = setTimeout(connect, 1500);
+  };
 }
 
-// zoznam svetiel sa môže zmeniť v appke → každých 5 s skontroluj
+// zoznam svetiel sa môže zmeniť v appke → počas behu každých 5 s skontroluj
 let fxSig = "";
 async function loadFixtures() {
   try {
@@ -447,5 +453,26 @@ async function loadFixtures() {
     if (sig !== fxSig) { fxSig = sig; FX = f; buildPanel(); }
   } catch { /* box offline */ }
 }
-loadFixtures().then(() => { connect(); requestAnimationFrame(frame); });
-setInterval(loadFixtures, 5000);
+
+const startEl = document.getElementById("start"), stopBtn = document.getElementById("stop");
+async function start() {
+  if (running) return;
+  running = true;
+  startEl.hidden = true; stopBtn.hidden = false;
+  await loadFixtures();
+  connect();
+  fxTimer = setInterval(loadFixtures, 5000);
+  lastMs = performance.now();
+  rafId = requestAnimationFrame(frame);
+}
+function stop() {
+  running = false;
+  clearTimeout(retry); clearInterval(fxTimer); cancelAnimationFrame(rafId);
+  if (ws) { ws.onmessage = null; ws.close(); ws = null; }
+  dmx = new Array(512).fill(0);
+  g.clearRect(0, 0, cv.width, cv.height);
+  document.getElementById("bpm").textContent = "--- BPM";
+  startEl.hidden = false; stopBtn.hidden = true;
+}
+document.getElementById("start-btn").onclick = start;
+stopBtn.onclick = stop;

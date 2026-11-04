@@ -30,6 +30,15 @@
     .c.gen .bar i { background: #6be3a0; }
     .c b { font-weight: 600; font-size: 11px; font-variant-numeric: tabular-nums; }
     .c small { font-size: 9px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #start { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center;
+      background: radial-gradient(circle at 50% 40%, #1a1030, #000 70%); }
+    #start[hidden] { display: none; }
+    #start h1 { margin: 0 0 6px; font-size: 22px; color: #fff; }
+    #start p { margin: 0 0 22px; color: #9a9ab0; max-width: 300px; }
+    #start-btn { font: 700 18px system-ui, sans-serif; letter-spacing: .08em; color: #fff; cursor: pointer;
+      padding: 16px 44px; border-radius: 16px; border: 0; background: #ff2e7e; box-shadow: 0 0 30px #ff2e7e66; }
+    #start-btn:active { transform: scale(.96); }
+    button[hidden] { display: none; }
     @media (max-width: 700px) {
       #dmx { grid-template-columns: repeat(18, 1fr); }
       .c { grid-template-rows: 30px auto auto; }
@@ -39,13 +48,21 @@
 <body>
   <canvas id="c"></canvas>
   <div class="hud">
-    <span id="conn" class="pill off">offline</span>
+    <span id="conn" class="pill off">zastavené</span>
     <span id="bpm" class="pill">--- BPM</span>
     <span class="grow"></span>
+    <button id="stop" class="pill" hidden>■ Zastaviť</button>
     <button id="toggle" class="pill">DMX kanály</button>
     <a class="pill" href="/" target="_blank">Ovládanie</a>
   </div>
   <div id="dmx"></div>
+  <div id="start">
+    <div>
+      <h1>Virtuálne svetlá</h1>
+      <p>Kým viz nespustíš, nič sa nekreslí a box jej neposiela žiadne dáta.</p>
+      <button id="start-btn">SPUSTIŤ</button>
+    </div>
+  </div>
   <script src="viz.js"></script>
 </body>
 </html>
