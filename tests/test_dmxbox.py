@@ -1284,3 +1284,33 @@ def test_engine_intensity_floor_and_peak(engine):
     a.section = "main"
     eng.compute(a, 1.2)
     assert eng.status.section == "main" and eng.status.dynamics == "sections"
+
+
+
+def test_intensity_dj_set_buildup_peaks_without_kick():
+    """Živý set (bez detekovaného kicku): dlhý breakdown, potom energia stúpa → vrchol,
+    nie pád späť na groove (reálny log z boxu, Oliver Heldens live)."""
+    from dmxbox.genre import IntensityTracker
+    it = IntensityTracker()
+    t, dt, beats, levels = 0.0, 0.05, 0.0, []
+
+    def run(seconds, db0, db1):
+        nonlocal t, beats
+        n = int(seconds / dt)
+        for i in range(n):
+            db = db0 + (db1 - db0) * i / max(1, n - 1)
+            rms = 10 ** (db / 20)
+            lvl = it.update(t, dt, rms, False, beats, 128.0, False, high=rms)
+            levels.append((round(t, 1), lvl))
+            t += dt
+            beats += dt * 128 / 60
+    run(50, -20, -20)          # groove
+    run(45, -32, -32)          # dlhý breakdown
+    run(12, -32, -20)          # energia stúpa späť (build + drop)
+    run(20, -19, -19)
+    ramp = [l for tt, l in levels if 95 <= tt <= 127]
+    assert 4 in ramp, "chýba vrchol po návrate energie"
+    first4 = next(tt for tt, l in levels if l == 4 and tt >= 95)
+    assert first4 <= 109                                   # do ~2 s po návrate
+    between = [l for tt, l in levels if 96 <= tt < first4]
+    assert 2 not in between                                # nie pád na groove počas stúpania

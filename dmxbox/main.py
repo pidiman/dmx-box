@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -88,6 +90,22 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
                AirplayKeep(resolve(cfg.get("airplay_file", "airplay.json"))))
 
 
+def _track_watch(box) -> None:
+    """Zmena skladby → analýza intenzity sa učí rozsah novej skladby (každá má inú hlasitosť)."""
+    last = None
+    while True:
+        try:
+            tr = box.nowplaying.track
+            key = (tr.artist, tr.title) if tr and tr.title else None
+            if key and key != last:
+                if last is not None:
+                    box.analyzer.new_track()
+                last = key
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1.0)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="DMX-BOX")
     ap.add_argument("--config", default="config.yaml")
@@ -118,6 +136,7 @@ def main() -> None:
     box.engine.start()
     if box.nowplaying:
         box.nowplaying.start()
+        threading.Thread(target=_track_watch, args=(box,), daemon=True, name="track-watch").start()
     if box.speaker:
         box.speaker.start()
     if box.airkeep:

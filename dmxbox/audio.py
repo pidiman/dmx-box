@@ -269,6 +269,10 @@ class Analyzer(threading.Thread):
         self._pending_source: tuple[Iterator[np.ndarray], bool] | None = None
 
     # --- verejné API --------------------------------------------------------
+    def new_track(self) -> None:
+        """Volá sa pri zmene skladby: intenzita sa učí rozsah novej skladby odznova."""
+        self._new_track = True
+
     def snapshot(self) -> AudioState:
         with self._lock:
             return copy.copy(self.state)
@@ -342,6 +346,9 @@ class Analyzer(threading.Thread):
         t = self._frames * self.hop / self.rate
         dt = n / self.rate
 
+        if getattr(self, "_new_track", False):
+            self._new_track = False
+            self.music.intensity.reset(t)
         mag = np.abs(np.fft.rfft(self.buf * self.window))
         rms = float(np.sqrt(np.mean(block.astype(np.float64) ** 2)))
 
