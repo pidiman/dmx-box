@@ -1186,3 +1186,23 @@ def test_frame_size_follows_rig(tmp_path):
     end = 60 + last["footprint"] - 1
     assert box.out.channels == frame_size(end) and r.json()["frame"] == frame_size(end)
     assert "512" in (r.json().get("warning") or "")
+
+
+def test_belka_punches_on_drop(engine):
+    """Drop bez detekovaného kicku: Belka PAR aj tak udrie na dobu, strobo modul blikne."""
+    eng, an, store = engine
+    a = an.snapshot()
+    a.silent = False
+    store.update(auto=True, style="techno")
+    b = eng.rig["belka"]
+    par = lambda f: max(f[b.addr(ch) - 1] for ch in ("par_red", "par_green", "par_blue", "par_white"))
+    a.section, a.drop_count = "drop", a.drop_count + 1
+    eng.compute(a, 1.0)
+    a.beat_count += 3                            # 3. doba po drope, začiatok doby, žiadny nový onset
+    a.beat_phase = 0.02
+    f = eng.compute(a, 1.5)
+    assert par(f) >= 200
+    assert f[b.addr("strobe_uv") - 1] == 255 and f[b.addr("strobe_speed") - 1] > 200
+    a.beat_phase = 0.7                           # koniec doby: dozneje, strobo stojí
+    f2 = eng.compute(a, 1.6)
+    assert par(f2) < par(f) and f2[b.addr("strobe_speed") - 1] == 0

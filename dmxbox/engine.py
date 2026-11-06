@@ -117,7 +117,7 @@ class Engine(threading.Thread):
             MOVE_FX[move_name](ctx, L)
             self.status.idle = False
             if s.auto:
-                drop_strobe = self._shape(L, look, section, a, fs)
+                drop_strobe = self._shape(L, look, section, a, fs, ctx)
         self.status.color_fx, self.status.move_fx = color_name, move_name
 
         if s.manual_color:
@@ -258,7 +258,7 @@ class Engine(threading.Thread):
         self.status.auto_index = self._auto_i
         return look.sets[self._auto_i % len(look.sets)]
 
-    def _shape(self, L: Look, look: StyleLook, section: str, a: AudioState, fs) -> bool:
+    def _shape(self, L: Look, look: StyleLook, section: str, a: AudioState, fs, c: Ctx | None = None) -> bool:
         """Úprava podľa štýlu a fázy skladby. Vráti True, ak má ísť krátke strobo dropu."""
         if not look.derby:
             L.derby, L.derby_motor = OFF, 0.0
@@ -283,8 +283,25 @@ class Engine(threading.Thread):
             since = a.beats - self._drop_beat
             L.bar_dim = max(L.bar_dim, 0.9)
             L.head_dim = max(L.head_dim, 0.9)
-            return look.strobe_drop and 0.0 <= since < 1.0     # strobo len 1 dobu
+            if c is not None and 0.0 <= since < self.DROP_PUNCH_BEATS:
+                self._belka_drop(L, look, c, since)
+            return look.strobe_drop and 0.0 <= since < 1.0     # strobo celej show len 1 dobu
         return False
+
+    DROP_PUNCH_BEATS = 16      # 4 takty po drope Belka „búcha“ do rytmu
+
+    def _belka_drop(self, L: Look, look: StyleLook, c: Ctx, since: float) -> None:
+        """Belka na drope: PAR udrie na každú dobu (mriežka beatov + kick), derby naplno,
+        strobo modul blikne na začiatku každej doby prvé 2 takty. Nespolieha sa len na
+        detekciu kicku – pri hustom drope ju kompresia často „zje“ a Belka ostala tmavá."""
+        k = max(c.pulse(5.0), c.flash)
+        col = c.color(c.beat + 1)
+        punch = scale(col, 0.35 + 0.65 * k)
+        L.par = tuple(max(x, y) for x, y in zip(L.par, punch))
+        if look.derby:
+            L.derby, L.derby_motor = c.color(c.beat + 2), 1.0
+        if look.strobe_drop and since < 8 and c.phase < 0.2:
+            L.strobe_uv, L.strobe_speed = 1.0, 0.95
 
     AMBIENT_BPM = 30.0
 

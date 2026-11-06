@@ -87,8 +87,10 @@ def kick_flash(c: Ctx, L: Look) -> None:
     base = c.color(c.bar)
     L.bar = tuple(base[i] * (1 - f) + WHITE[i] * f for i in range(4))
     L.bar_dim = 0.15 + 0.85 * f
-    L.par = scale(WHITE, f) if f > 0.2 else scale(base, 0.15)
-    L.derby = scale(c.color(c.bar + 1), 0.3 + 0.7 * f)
+    # Belka PAR: udrie aj na mriežku beatov, nie len na detekovaný kick (ten pri hustej hudbe chýba)
+    k = max(f, c.pulse(6.0))
+    L.par = tuple(base[i] * 0.25 * (1 - k) + WHITE[i] * k for i in range(4)) if k > 0.2 else scale(base, 0.25)
+    L.derby = scale(c.color(c.bar + 1), 0.3 + 0.7 * k)
     L.derby_motor = 0.8
     L.head_color = WHITE if f > 0.5 else base
     L.laser = ("green" if c.s.laser and f > 0.6 else "off")
