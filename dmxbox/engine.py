@@ -120,6 +120,8 @@ class Engine(threading.Thread):
                 drop_strobe = self._shape(L, look, section, a, fs, ctx)
         self.status.color_fx, self.status.move_fx = color_name, move_name
 
+        if not self.status.idle and L.laser == "off" and fs.laser and section != "breakdown":
+            self._laser_bed(ctx, L)
         if s.manual_color:
             mc = tuple(float(x) for x in s.manual_color[:4])
             L.bar, L.par, L.derby, L.head_color = mc, mc, mc, mc
@@ -287,6 +289,16 @@ class Engine(threading.Thread):
                 self._belka_drop(L, look, c, since)
             return look.strobe_drop and 0.0 <= since < 1.0     # strobo celej show len 1 dobu
         return False
+
+    LASER_BED_LEVEL = 0.4
+
+    def _laser_bed(self, c: Ctx, L: Look) -> None:
+        """Laser Belky ako podklad pri hlasnejšej hudbe: prvé 2 doby každého taktu, farba sa strieda
+        po taktoch. Efekty, ktoré laser riadia samy (beat chase, split…), majú prednosť."""
+        if c.a.level < self.LASER_BED_LEVEL:
+            return
+        if c.beat % 4 < 2:
+            L.laser = ("red", "green", "both")[c.bar % 3]
 
     DROP_PUNCH_BEATS = 16      # 4 takty po drope Belka „búcha“ do rytmu
 

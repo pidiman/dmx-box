@@ -93,7 +93,7 @@ def kick_flash(c: Ctx, L: Look) -> None:
     L.derby = scale(c.color(c.bar + 1), 0.3 + 0.7 * k)
     L.derby_motor = 0.8
     L.head_color = WHITE if f > 0.5 else base
-    L.laser = ("green" if c.s.laser and f > 0.6 else "off")
+    L.laser = ("green" if c.s.laser and k > 0.35 else "off")      # celý úder, nie len 60 ms
 
 
 def build_up(c: Ctx, L: Look) -> None:

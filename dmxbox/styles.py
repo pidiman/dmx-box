@@ -54,7 +54,7 @@ LOOKS: dict[str, StyleLook] = {
         sets=[("beat_chase", "sweep"), ("kick_flash", "tilt_bounce"), ("color_step", "jump"),
               ("build_up", "sweep")],
         calm=("bass_pump", "hold"), build=("build_up", "tilt_bounce"), drop=("kick_flash", "jump"),
-        fade_bias=-0.15, size_k=0.8, derby=False, bars=16),
+        fade_bias=-0.15, size_k=0.8, bars=16),          # derby povolené (studené farby z palety ice)
     # House: teplé farby, groove, derby, plynulejší pohyb
     "house": StyleLook(
         "house", "warm",

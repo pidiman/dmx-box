@@ -1206,3 +1206,22 @@ def test_belka_punches_on_drop(engine):
     a.beat_phase = 0.7                           # koniec doby: dozneje, strobo stojí
     f2 = eng.compute(a, 1.6)
     assert par(f2) < par(f) and f2[b.addr("strobe_speed") - 1] == 0
+
+
+def test_belka_laser_bed_and_techno_derby(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    a.silent, a.level = False, 0.7
+    store.update(auto=False, color_fx="color_step", laser=True)    # color step laser sám neriadi
+    b = eng.rig["belka"]
+    a.beat_count, a.beat_phase = 4, 0.3                            # 1. doba taktu
+    assert eng.compute(a, 1.0)[b.addr("laser") - 1] > 63
+    a.beat_count = 6                                               # 3. doba: pauza
+    assert eng.compute(a, 1.1)[b.addr("laser") - 1] <= 63
+    a.level, a.beat_count = 0.2, 4                                 # potichu laser nie
+    assert eng.compute(a, 1.2)[b.addr("laser") - 1] <= 63
+    store.update(laser=False)
+    a.level = 0.8
+    assert eng.compute(a, 1.3)[b.addr("laser") - 1] <= 63
+    from dmxbox.styles import LOOKS
+    assert LOOKS["techno"].derby
