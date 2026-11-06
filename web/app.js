@@ -63,6 +63,8 @@ FX_INFO.tempo = {
 };
 
 const SECTION_NAMES = { main: "hrá", breakdown: "breakdown", build: "build-up", drop: "DROP" };
+const LEVEL_NAMES = { 0: "ticho", 1: "pokoj", 2: "groove", 3: "rozohrievanie", 4: "VRCHOL" };
+const INT_SECTION = { 1: "breakdown", 2: "main", 3: "build", 4: "drop" };
 let styleNames = {};
 
 let settings = {};
@@ -166,6 +168,10 @@ function hex(rgbw) {
 
 function apply(s) {
   settings = s;
+  document.querySelectorAll("#dyn button").forEach((b) => {
+    const on = b.dataset.v === (s.dynamics || "intensity");
+    b.classList.toggle("on", on); b.setAttribute("aria-checked", on);
+  });
   for (const id of ["master", "size", "fade"]) if (dragging !== id) $("#" + id).value = s[id];
   if (dragging !== "delay") { $("#delay").value = s.light_delay_ms; $("#delay-out").textContent = s.light_delay_ms + " ms"; }
   document.querySelectorAll("#speed button").forEach((b) => b.classList.toggle("on", +b.dataset.v === s.speed));
@@ -210,9 +216,17 @@ function live(d) {
     const sure = Math.round(m.confidence * 100);
     $("#style-detect").textContent = a.silent ? "ticho" : `rozpoznané: ${m.name} · ${sure} %`;
     $("#style-now").textContent = e.idle ? "" : (styleNames[e.style] || e.style) + (e.style_auto ? "" : " (pevne)");
-    const sec = $("#section");
-    sec.textContent = a.silent ? "—" : SECTION_NAMES[e.section] + (e.section === "build" ? ` ${Math.round(m.build * 100)} %` : "");
-    sec.className = "pill sec-" + e.section;
+    const sec = $("#section"), lvl = $("#lvl"), byInt = e.dynamics !== "sections";
+    if (byInt) {
+      const n = a.silent ? 0 : e.intensity;
+      sec.textContent = a.silent ? "—" : `${n} · ${LEVEL_NAMES[n]}` + (n === 3 ? ` ${Math.round(e.heat * 100)} %` : "");
+      sec.className = "pill sec-" + (INT_SECTION[n] || "main");
+      lvl.hidden = false; lvl.dataset.l = n;
+    } else {
+      sec.textContent = a.silent ? "—" : SECTION_NAMES[e.section] + (e.section === "build" ? ` ${Math.round(m.build * 100)} %` : "");
+      sec.className = "pill sec-" + e.section;
+      lvl.hidden = true;
+    }
   }
   const f = d.fog || {}, fb = $("#fog");
   fb.style.display = f.present === false ? "none" : "";
@@ -627,3 +641,8 @@ init().catch(err);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
   setOn(on);
 }
+
+document.querySelectorAll("#dyn button").forEach((b) => b.addEventListener("click", () => {
+  patch({ dynamics: b.dataset.v });
+  toast(b.dataset.v === "sections" ? "Pôvodný systém: fázy skladby" : "Nový systém: intenzita 1–4");
+}));

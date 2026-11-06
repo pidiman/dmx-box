@@ -8,7 +8,8 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
 PRESET_KEYS = ("color_fx", "move_fx", "speed", "size", "fade", "palette",
-               "master", "auto", "auto_bars", "laser", "uv", "fog_auto", "style", "style_palette")
+               "master", "auto", "auto_bars", "laser", "uv", "fog_auto", "style", "style_palette",
+               "dynamics")
 
 
 @dataclass
@@ -35,6 +36,7 @@ class Settings:
     fog_auto: bool = False      # auto výstrek na drop
     fog_burst_s: float = 3.0    # dĺžka auto výstreku
     ambient: bool = False       # svetlá bez hudby: pomalé scény bez analýzy (scenár Ambient)
+    dynamics: str = "intensity"  # ako svetlá sledujú skladbu: intensity (úrovne 1–4) | sections (pôvodné fázy)
 
 
 class Store:

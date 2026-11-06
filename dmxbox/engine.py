@@ -44,6 +44,12 @@ class Status:
     style: str = "party"        # štýl, podľa ktorého sa práve svieti
     style_auto: bool = True     # rozpoznaný (True) alebo pevne zvolený
     section: str = "main"
+    dynamics: str = "intensity"
+    intensity: int = 2          # 1 pokoj | 2 groove | 3 rozohrievanie | 4 vrchol
+    heat: float = 0.0
+
+
+INTENSITY_SECTION = {1: "breakdown", 2: "main", 3: "build", 4: "drop"}
 
 
 class Engine(threading.Thread):
@@ -83,12 +89,25 @@ class Engine(threading.Thread):
         style_auto = s.style not in LOOKS
         look = look_for(a.style if style_auto else s.style)
         self.status.style, self.status.style_auto = look.key, style_auto
-        section = a.section if s.auto else "main"
+        by_intensity = s.dynamics != "sections"
+        self.status.dynamics = "intensity" if by_intensity else "sections"
+        self.status.intensity, self.status.heat = a.intensity, a.heat
+        if by_intensity:
+            # nový systém: úroveň intenzity 1–4 → rovnaké „fázy“ ako doteraz, ale stabilné a podľa
+            # energie voči celej skladbe; build_progress = ako veľmi sa svetlá rozohriali
+            section = INTENSITY_SECTION.get(a.intensity, "main") if s.auto else "main"
+            drop_event = a.peak_count != self._drop_count
+            if drop_event:
+                self._drop_count = a.peak_count
+                self._drop_beat = a.beats
+            a = replace(a, build_progress=a.heat)
+        else:
+            section = a.section if s.auto else "main"
+            drop_event = a.drop_count != self._drop_count
+            if drop_event:
+                self._drop_count = a.drop_count
+                self._drop_beat = a.beats
         self.status.section = section
-        drop_event = a.drop_count != self._drop_count
-        if drop_event:
-            self._drop_count = a.drop_count
-            self._drop_beat = a.beats
 
         palette_name = s.palette
         fs = s                       # nastavenia pre efekty (štýl ich v auto móde doladí)
@@ -118,6 +137,8 @@ class Engine(threading.Thread):
             self.status.idle = False
             if s.auto:
                 drop_strobe = self._shape(L, look, section, a, fs, ctx)
+                if by_intensity:
+                    self._intensity_extra(L, look, a.intensity, a.heat, ctx, fs)
         self.status.color_fx, self.status.move_fx = color_name, move_name
 
         if not self.status.idle and L.laser == "off" and fs.laser and section != "breakdown":
@@ -289,6 +310,32 @@ class Engine(threading.Thread):
                 self._belka_drop(L, look, c, since)
             return look.strobe_drop and 0.0 <= since < 1.0     # strobo celej show len 1 dobu
         return False
+
+    FLOOR_BAR, FLOOR_PAR = 0.3, 0.25     # parket nikdy tmavý (nový systém)
+
+    def _intensity_extra(self, L: Look, look: StyleLook, level: int, heat: float, c: Ctx, fs) -> None:
+        """Doplnky nového systému k _shape: minimum jasu, plynulé rozohrievanie, plný vrchol."""
+        if level == 3:
+            if look.derby and any(L.derby):
+                L.derby_motor = max(L.derby_motor, 0.3 + 0.7 * heat)
+            L.par = scale(L.par, 0.6 + 0.4 * heat) if any(L.par) else L.par
+            L.head_dim = max(L.head_dim, 0.5 + 0.5 * heat)
+            L.pt_speed = min(L.pt_speed, 0.6 * (1 - heat))      # pohyb sa zrýchľuje
+            if fs.laser and heat > 0.5 and L.laser == "off":   # laser hustne: na každú dobu
+                L.laser = ("red", "green", "both")[c.beat % 3]
+        elif level == 4:
+            L.derby = L.derby if any(L.derby) else c.color(c.beat + 2)
+            L.derby_motor = 1.0
+            L.head_dim = max(L.head_dim, 0.9)
+            L.pt_speed = 0.0
+            if fs.laser and L.laser == "off" and c.phase < 0.6:
+                L.laser = ("red", "green", "both")[c.beat % 3]
+        # minimum: aspoň lišta a Belka PAR svietia (farba z palety, ak efekt nechal tmu)
+        if not any(L.bar):
+            L.bar = c.color(c.bar)
+        L.bar_dim = max(L.bar_dim, self.FLOOR_BAR)
+        base = c.color(c.bar + 1)
+        L.par = tuple(max(x, y * self.FLOOR_PAR) for x, y in zip(L.par, base))
 
     LASER_BED_LEVEL = 0.4
 

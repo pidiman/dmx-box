@@ -47,6 +47,10 @@ class AudioState:
     drop_count: int = 0
     build_progress: float = 0.0
     features: dict = field(default_factory=dict)
+    intensity: int = 2          # 1 pokoj | 2 groove | 3 rozohrievanie | 4 vrchol
+    heat: float = 0.0           # 0–1 ako veľmi sa svetlá rozohriali (úroveň 3)
+    peak_count: int = 0
+    intensity_score: float = 0.5
     # vizualizácia v appke: 24 pásiem (basy → výšky) pre ľavý a pravý kanál, 0–1
     viz_l: list = field(default_factory=list)
     viz_r: list = field(default_factory=list)
@@ -443,7 +447,7 @@ class Analyzer(threading.Thread):
         info = self.music.update(t, dt, pos2=pos2, beats=beats_now, bpm=bpm_now,
                                  kick=strength if kick_hit else 0.0, snare=snare_pk, hat=hat_pk, centroid=centroid, sub=sub,
                                  level=vals["level"], high=vals["high"], onset=kick_hit,
-                                 onset_strength=strength, silent=silent)
+                                 onset_strength=strength, silent=silent, rms=rms)
         with self._lock:
             s.viz_l, s.viz_r = self.viz.l.tolist(), self.viz.r.tolist()
             s.style, s.style_confidence = info.style, info.style_confidence
@@ -451,6 +455,8 @@ class Analyzer(threading.Thread):
             s.section, s.drop_count = info.section, info.drop_count
             s.build_progress = info.build_progress
             s.features = info.features
+            s.intensity, s.heat, s.peak_count = info.intensity, info.heat, info.peak_count
+            s.intensity_score = info.intensity_score
 
     def _estimate_tempo(self) -> None:
         if self._override_bpm is not None or len(self.flux_hist) < self.frame_rate * 4:

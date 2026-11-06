@@ -262,7 +262,8 @@ def create_app(box) -> FastAPI:
                       "high": round(a.high, 3), "level": round(a.level, 3),
                       "silent": a.silent},
             "engine": {"color_fx": st.color_fx, "move_fx": st.move_fx, "idle": st.idle,
-                       "style": st.style, "style_auto": st.style_auto, "section": st.section},
+                       "style": st.style, "style_auto": st.style_auto, "section": st.section,
+                       "dynamics": st.dynamics, "intensity": st.intensity, "heat": round(st.heat, 2)},
             "music": {"style": a.style, "name": STYLE_NAMES.get(a.style, a.style),
                       "confidence": round(a.style_confidence, 2),
                       "scores": {k: round(v, 2) for k, v in a.style_scores.items()},
@@ -314,6 +315,8 @@ def create_app(box) -> FastAPI:
             raise HTTPException(400, "neznámy move_fx")
         if "palette" in data and data["palette"] not in PALETTES:
             raise HTTPException(400, "neznáma paleta")
+        if "dynamics" in data and data["dynamics"] not in ("intensity", "sections"):
+            raise HTTPException(400, "dynamics: intensity | sections")
         if "style" in data and data["style"] not in STYLE_CHOICES:
             raise HTTPException(400, "neznámy štýl")
         if "line_in" in data:

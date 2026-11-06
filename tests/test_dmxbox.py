@@ -257,7 +257,7 @@ def test_breakdown_calm_and_drop_hit(engine):
     eng, an, store = engine
     a = an.snapshot()
     a.silent = False
-    store.update(auto=True, style="dnb", laser=True)
+    store.update(auto=True, style="dnb", laser=True, dynamics="sections")
     a.section = "breakdown"
     f = eng.compute(a, 1.0)
     assert (eng.status.color_fx, eng.status.move_fx) == LOOKS["dnb"].calm
@@ -274,7 +274,7 @@ def test_fog_on_drop_event(engine):
     eng, an, store = engine
     a = an.snapshot()
     a.silent = False
-    store.update(fog_auto=True, style="techno")
+    store.update(fog_auto=True, style="techno", dynamics="sections")
     assert eng.compute(a, 200.0)[32] == 0
     a.drop_count += 1
     assert eng.compute(a, 200.1)[32] == 255
@@ -1193,7 +1193,7 @@ def test_belka_punches_on_drop(engine):
     eng, an, store = engine
     a = an.snapshot()
     a.silent = False
-    store.update(auto=True, style="techno")
+    store.update(auto=True, style="techno", dynamics="sections")
     b = eng.rig["belka"]
     par = lambda f: max(f[b.addr(ch) - 1] for ch in ("par_red", "par_green", "par_blue", "par_white"))
     a.section, a.drop_count = "drop", a.drop_count + 1
@@ -1231,3 +1231,56 @@ def test_no_style_disables_lights():
     from dmxbox.styles import LOOKS
     for k, lk in LOOKS.items():
         assert lk.laser and lk.uv and lk.derby and lk.strobe_drop, k
+
+
+
+def _intensity_run(**kw):
+    an = Analyzer(iter(()), silence_seconds=2)
+    seen = []
+    for blk in synth_source(bpm=None, **kw):
+        an.process(blk)
+        s = an.snapshot()
+        if not seen or seen[-1][0] != s.intensity:
+            seen.append((s.intensity, s.t))
+    return seen, an.snapshot()
+
+
+def test_intensity_levels_breakdown_and_peak():
+    seen, last = _intensity_run(genre="house", seconds=80, breakdown=(30, 44))
+    lv = [x for x, _ in seen]
+    assert lv[0] == 2 and 1 in lv and 4 in lv
+    t_peak = dict((x, t) for x, t in reversed(seen))[4]
+    assert 44 <= t_peak <= 47.5                       # vrchol hneď po návrate energie
+    assert last.peak_count == 1
+
+
+def test_intensity_steady_music_stays_groove():
+    seen, last = _intensity_run(genre="techno", seconds=70)
+    assert [x for x, _ in seen] == [2] and last.peak_count == 0   # bez nervózneho prepínania
+
+
+def test_intensity_silence_is_not_peak():
+    seen, last = _intensity_run(genre="dnb", seconds=60, silence_every=25)
+    assert last.peak_count == 0
+
+
+def test_engine_intensity_floor_and_peak(engine):
+    eng, an, store = engine
+    a = an.snapshot()
+    a.silent, a.level = False, 0.5
+    store.update(auto=True, style="techno", dynamics="intensity")
+    b, p = eng.rig["belka"], eng.rig["parbar"]
+    par = lambda f: max(f[b.addr(ch) - 1] for ch in ("par_red", "par_green", "par_blue", "par_white"))
+    a.intensity = 1
+    f = eng.compute(a, 1.0)
+    assert eng.status.section == "breakdown"
+    assert f[p.addr("dimmer") - 1] >= int(255 * 0.3) - 1 and par(f) >= int(255 * 0.25) - 1   # nikdy tma
+    assert f[b.addr("laser") - 1] <= 63
+    a.intensity, a.peak_count = 4, a.peak_count + 1
+    f = eng.compute(a, 1.1)
+    assert eng.status.section == "drop" and f[b.addr("derby_motor") - 1] == 255
+    assert f[p.addr("macro") - 1] >= 201                       # strobo na 1. dobu vrcholu
+    store.update(dynamics="sections")                          # prepínač späť na pôvodný systém
+    a.section = "main"
+    eng.compute(a, 1.2)
+    assert eng.status.section == "main" and eng.status.dynamics == "sections"

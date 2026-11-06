@@ -6,6 +6,7 @@ Jeden JSON riadok na udalosť v logs/RRRR-MM-DD.jsonl. Druhy udalostí (`ev`):
   music    každých 30 s: BPM, istota, štýl a skóre žánrov, časť skladby, hlasitosť
   style    zmena rozpoznaného štýlu
   section  zmena časti skladby (main/breakdown/build/drop), drop
+  intensity zmena úrovne intenzity 1–4 (pokoj/groove/rozohrievanie/vrchol)
   fx       efekty, ktoré beží (AUTO alebo ručne)
   silence  začiatok/koniec ticha
   action   ručný zásah v appke (POST/PUT/DELETE na /api, bez hesiel a PINov)
@@ -212,13 +213,17 @@ class SessionLog(threading.Thread):
                 self.event("section", section=a.section, build=round(a.build_progress, 2))
             if self._changed("drops", a.drop_count):
                 self.event("drop", n=a.drop_count, bpm=round(a.bpm, 1))
+            if self._changed("intensity", a.intensity):
+                self.event("intensity", level=a.intensity, score=round(a.intensity_score, 2),
+                           heat=round(a.heat, 2), peaks=a.peak_count, mode=s.dynamics)
             if self._changed("fx", (st.color_fx, st.move_fx, s.auto)):
                 self.event("fx", color=st.color_fx, move=st.move_fx, auto=s.auto, style=st.style)
             if self._every("music", 30):
                 self.event("music", bpm=round(a.bpm, 1), confident=a.bpm_confident, style=a.style,
                            confidence=round(a.style_confidence, 2),
                            scores={k: round(v, 2) for k, v in a.style_scores.items()},
-                           section=a.section, level=round(a.level, 3), bass=round(a.bass, 3),
+                           section=a.section, intensity=a.intensity, score=round(a.intensity_score, 2),
+                           level=round(a.level, 3), bass=round(a.bass, 3),
                            high=round(a.high, 3), master=s.master, delay_ms=s.light_delay_ms)
         out = b.out
         if self._changed("dmx", (out.driver, out.connected)):
