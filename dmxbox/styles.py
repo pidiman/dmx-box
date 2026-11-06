@@ -32,6 +32,8 @@ class StyleLook:
     fade_bias: float = 0.0              # + mäkšie / − tvrdšie prechody
     size_k: float = 1.0                 # rozsah pohybu
     pt_slow: float = 0.0                # min. pomalosť pan/tilt (0 = bez obmedzenia)
+    # svetlá: žiadny štýl nemá žiadne svetlo zakázané (rozhodnutie používateľa) – polia ostávajú
+    # len pre budúce jemné ladenie, všetky štýly ich majú True
     laser: bool = True
     uv: bool = True
     derby: bool = True
@@ -48,7 +50,7 @@ LOOKS: dict[str, StyleLook] = {
               ("derby_party", "snap")],
         calm=("bass_pump", "audience"), build=("build_up", "sweep"), drop=("kick_flash", "snap"),
         fade_bias=-0.2, size_k=1.0, bars=8),
-    # Techno: chladné biele/modré, minimalistické, stroboskop a laser
+    # Techno: chladné biele/modré, stroboskop a laser
     "techno": StyleLook(
         "techno", "ice",
         sets=[("beat_chase", "sweep"), ("kick_flash", "tilt_bounce"), ("color_step", "jump"),
@@ -62,20 +64,20 @@ LOOKS: dict[str, StyleLook] = {
               ("split", "tilt_bounce")],
         calm=("rainbow", "circle_slow"), build=("build_up", "sweep"), drop=("derby_party", "jump"),
         fade_bias=0.1, size_k=0.9, bars=16),
-    # Hip-hop: fialová/zlatá, údery na kick (synkopy), pomalší pohyb, bez lasera
+    # Hip-hop: fialová/zlatá, údery na kick (synkopy), pomalší pohyb
     "hiphop": StyleLook(
         "hiphop", "urban",
         sets=[("kick_flash", "gobo_beat"), ("color_step", "audience"), ("bass_pump", "jump"),
               ("split", "gobo_beat")],
         calm=("bass_pump", "audience"), build=("color_step", "sweep"), drop=("kick_flash", "jump"),
-        fade_bias=0.0, size_k=0.7, pt_slow=0.3, laser=False, fog_drop=False, bars=8),
-    # Chill: pomalé dúhové prechody, žiadne strobo ani dym
+        fade_bias=0.0, size_k=0.7, pt_slow=0.3, fog_drop=False, bars=8),
+    # Chill: pomalé dúhové prechody, bez dymu na drop
     "chill": StyleLook(
         "chill", "cool",
         sets=[("rainbow", "circle_slow"), ("split", "audience"), ("bass_pump", "hold")],
         calm=("rainbow", "hold"), build=("rainbow", "circle_slow"), drop=("split", "circle_slow"),
-        fade_bias=0.35, size_k=0.6, pt_slow=0.6, laser=False, derby=False,
-        strobe_drop=False, fog_drop=False, bars=32),
+        fade_bias=0.35, size_k=0.6, pt_slow=0.6,
+        fog_drop=False, bars=32),
     # Pop/party: pestré, všetko povolené – pôvodný auto mód
     "party": StyleLook(
         "party", "party",

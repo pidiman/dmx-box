@@ -1225,3 +1225,9 @@ def test_belka_laser_bed_and_techno_derby(engine):
     assert eng.compute(a, 1.3)[b.addr("laser") - 1] <= 63
     from dmxbox.styles import LOOKS
     assert LOOKS["techno"].derby
+
+
+def test_no_style_disables_lights():
+    from dmxbox.styles import LOOKS
+    for k, lk in LOOKS.items():
+        assert lk.laser and lk.uv and lk.derby and lk.strobe_drop, k
