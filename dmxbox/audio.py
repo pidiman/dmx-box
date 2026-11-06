@@ -447,7 +447,8 @@ class Analyzer(threading.Thread):
         info = self.music.update(t, dt, pos2=pos2, beats=beats_now, bpm=bpm_now,
                                  kick=strength if kick_hit else 0.0, snare=snare_pk, hat=hat_pk, centroid=centroid, sub=sub,
                                  level=vals["level"], high=vals["high"], onset=kick_hit,
-                                 onset_strength=strength, silent=silent, rms=rms)
+                                 onset_strength=strength, silent=silent, rms=rms,
+                                 high_raw=float(np.sqrt(energies["high"])))
         with self._lock:
             s.viz_l, s.viz_r = self.viz.l.tolist(), self.viz.r.tolist()
             s.style, s.style_confidence = info.style, info.style_confidence

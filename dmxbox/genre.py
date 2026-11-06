@@ -272,17 +272,19 @@ class SectionTracker:
 
 
 class IntensityTracker:
-    """Intenzita skladby 1–4 (pokoj / groove / rozohrievanie / vrchol) podľa energie
-    voči tejto skladbe – nie voči posledným sekundám ako AGC.
+    """Intenzita skladby 1–4 (pokoj / groove / rozohrievanie / vrchol) voči tejto skladbe.
 
-    energia = hlasitosť v dB (RMS pred AGC) vyhladená ~3 s + hustota kickov;
-    rozsah skladby = 15. a 90. percentil energie za posledných ~90 s.
-    Úroveň drží aspoň HOLD_S, vrchol aspoň 32 dôb a ďalší najskôr o PEAK_GAP_S."""
+    energia = hlasitosť v dB (RMS pred AGC) vyhladená ~2 s, rozsah skladby = percentily za ~90 s;
+    pokoj   = výrazne tichšie (≥ 5 dB pod mediánom) a takmer bez kicku,
+    rozohr. = rastú výšky (riser, snare roll) alebo hlasitosť – aj bez kicku (build pred dropom!),
+    vrchol  = po pokoji / rozohrievaní sa vráti kick s plnou energiou, alebo energia výrazne
+              nad priemerom skladby; drží ≥ 32 dôb, ďalší najskôr o 30 s."""
 
-    HOLD_S = 4.0
+    HOLD_S = 3.0
     PEAK_GAP_S = 30.0
     PEAK_BEATS = 32
     LEARN_S = 10.0
+    QUIET_DB = 5.0
 
     def __init__(self):
         self.level = 2
@@ -292,6 +294,7 @@ class IntensityTracker:
         self.short: float | None = None
         self.fast = -60.0
         self.kicks = 0.0
+        self.hs = self.hl = 0.0
         self.hist: deque[float] = deque(maxlen=180)     # 90 s po 0,5 s
         self._next_sample = 0.0
         self._since = 0.0
@@ -299,7 +302,7 @@ class IntensityTracker:
         self._peak_until = -1.0
         self._t0: float | None = None
         self._silent_t = -1e9
-        self._calm_since: float | None = None
+        self._tension: float | None = None              # od kedy trvá pokoj/rozohrievanie
 
     def _range(self) -> tuple[float, float, float]:
         arr = sorted(self.hist)
@@ -307,22 +310,27 @@ class IntensityTracker:
         return q(0.15), q(0.5), q(0.9)
 
     def slope(self) -> float:
-        """Nárast energie za posledných ~8 s (dB)."""
-        if len(self.hist) < 17:
+        """Nárast energie za posledných ~6 s (dB)."""
+        if len(self.hist) < 13:
             return 0.0
-        return self.hist[-1] - self.hist[-17]
+        return self.hist[-1] - self.hist[-13]
 
     def update(self, t: float, dt: float, rms: float, onset: bool, beats: float, bpm: float,
-               silent: bool) -> int:
+               silent: bool, high: float = 0.0) -> int:
         if self._t0 is None:
             self._t0 = t
         db = 10.0 * math.log10(rms * rms + 1e-10)
         if self.short is None:
             self.short = self.fast = db
-        self.short += (db - self.short) * (1 - math.exp(-dt / 3.0))
+        self.short += (db - self.short) * (1 - math.exp(-dt / 2.0))
         self.fast += (db - self.fast) * (1 - math.exp(-dt / 0.8))
+        hdb = 10.0 * math.log10(high * high + 1e-12)        # výšky v dB (pred AGC) – riser, snare roll
+        if self.hs == 0.0 and self.hl == 0.0:
+            self.hs = self.hl = hdb
+        self.hs += (hdb - self.hs) * (1 - math.exp(-dt / 1.0))
+        self.hl += (hdb - self.hl) * (1 - math.exp(-dt / 6.0))
         beat_dt = max(dt * bpm / 60.0, 1e-6)
-        self.kicks += ((1.0 / beat_dt if onset else 0.0) - self.kicks) * (1 - math.exp(-dt / 3.0))
+        self.kicks += ((1.0 / beat_dt if onset else 0.0) - self.kicks) * (1 - math.exp(-dt / 2.5))
         if t >= self._next_sample:
             self._next_sample = t + 0.5
             if not silent and t - self._t0 >= 3.0:          # prvé sekundy: EMA sa ešte usádza
@@ -330,34 +338,33 @@ class IntensityTracker:
         if silent:
             self._silent_t = t
             self._set(1, t)
-            self._calm_since = None                       # ticho medzi skladbami nie je breakdown
+            self._tension = None                           # ticho medzi skladbami nie je breakdown
             self.heat = 0.0
             return self.level
         if t - self._t0 < self.LEARN_S or len(self.hist) < 20:
             return self.level                            # začiatok: učí sa rozsah, drží groove
         lo, mid, hi = self._range()
-        span = max(hi - lo, 8.0)                           # rovnomerná skladba = medián = groove
+        span = max(hi - lo, 10.0)
         rel = lambda x: max(0.0, min(1.2, 0.5 + (x - mid) / span))
-        k = 0.2 * min(1.0, self.kicks)
-        self.score = 0.8 * rel(self.short) + k
-        fast = 0.8 * rel(self.fast) + k
-        dynamic = hi - lo >= 6.0 and t - self._t0 >= 20.0   # vrchol až keď skladba ukázala rozdiely
+        kick = min(1.0, self.kicks)
+        self.score = 0.8 * rel(self.short) + 0.2 * kick
         sl = self.slope()
         cur, held = self.level, t - self._since >= self.HOLD_S
 
         if cur == 4:
             if beats < self._peak_until or self.score >= 0.7:
                 return self._heat(4, dt)
-            new = 2 if self.score >= 0.3 else 1          # po vrchole späť podľa hudby
+            new = 1 if self.short < mid - self.QUIET_DB and kick < 0.4 else 2
             self._set(new, t)
             return self._heat(new, dt)
 
-        can_peak = t - self._peak_t >= self.PEAK_GAP_S
-        rising = sl >= 2.5
-        # návrat plnej energie po aspoň 8 s pokoja (breakdown → drop), nie po tichu medzi skladbami
-        calm_long = cur in (1, 3) and self._calm_since is not None and t - self._calm_since >= 8.0
-        comeback = calm_long and self.fast >= mid - 1.5 and t - self._silent_t > 8.0
-        if dynamic and can_peak and (comeback or (self.score >= 0.85 and (cur == 3 or rising))):
+        quiet = self.short < mid - self.QUIET_DB and kick < 0.4
+        riser = self.hs > self.hl + 2.0 or sl >= 2.0
+        tension_long = self._tension is not None and t - self._tension >= 4.0
+        comeback = (cur in (1, 3) and tension_long and t - self._silent_t > 15.0 and kick >= 0.5 and self.fast >= mid - 2.0
+                    and t - self._silent_t > 8.0)
+        loud_peak = self.score >= 0.85 and (cur == 3 or sl >= 2.5)
+        if t - self._t0 >= 20.0 and t - self._peak_t >= self.PEAK_GAP_S and (comeback or loud_peak):
             self.peak_count += 1
             self._peak_t = t
             self._peak_until = beats + self.PEAK_BEATS
@@ -365,22 +372,28 @@ class IntensityTracker:
             return self._heat(4, dt)
         if not held:
             return self._heat(cur, dt)
-        if cur == 1:
-            new = 1 if self.score < 0.35 else (3 if rising else 2)
-        elif cur == 3:
-            new = 3 if (sl > 0.5 and self.score >= 0.3) else (1 if self.score < 0.22 else 2)
+        if t - self._silent_t < 10.0:                    # nová skladba po tichu: najprv groove
+            new = 1 if quiet else 2
+        elif riser and (kick < 0.5 or cur in (1, 3) or sl >= 2.0):
+            new = 3                                          # napätie rastie – aj bez kicku
+        elif cur == 1 and (self.short < mid - self.QUIET_DB + 1.5 and kick < 0.6):
+            new = 1                                          # z pokoja až pri jasnom návrate
+        elif quiet:
+            new = 1
+        elif cur == 3 and sl > 0.0 and kick < 0.5:
+            new = 3                                          # build ešte beží (bez kicku)
         else:
-            new = 1 if self.score < 0.22 else (3 if rising and self.score >= 0.35 else 2)
+            new = 2
         if new != cur:
             self._set(new, t)
         return self._heat(new, dt)
 
     def _set(self, lvl: int, t: float) -> None:
         if lvl != self.level:
-            if lvl == 1 and self.level in (2, 4):
-                self._calm_since = t
+            if lvl in (1, 3) and self.level in (2, 4):
+                self._tension = t
             elif lvl in (2, 4):
-                self._calm_since = None
+                self._tension = None
             self.level, self._since = lvl, t
             if lvl == 3:
                 self.heat = 0.0
@@ -388,8 +401,8 @@ class IntensityTracker:
     def _heat(self, lvl: int, dt: float) -> int:
         if lvl == 4:
             self.heat = 1.0
-        elif lvl == 3:                                    # rozohrievanie: plynulo nahor ~12 s
-            self.heat = min(1.0, max(self.heat + dt / 12.0, (self.score - 0.35) / 0.5))
+        elif lvl == 3:                                    # rozohrievanie: plynulo nahor ~10 s
+            self.heat = min(1.0, max(self.heat + dt / 10.0, (self.score - 0.35) / 0.5))
         else:
             self.heat = 0.0
         return lvl
@@ -424,11 +437,11 @@ class MusicAnalyzer:
     def update(self, t: float, dt: float, *, pos2: float, beats: float, bpm: float,
                kick: float, snare: float, hat: float, centroid: float, sub: float,
                level: float, high: float, onset: bool, onset_strength: float,
-               silent: bool, rms: float = 0.0) -> MusicInfo:
+               silent: bool, rms: float = 0.0, high_raw: float = 0.0) -> MusicInfo:
         self.profile.add(pos2, kick, snare, hat, centroid, sub, level, dt, onset,
                          onset_strength, bpm, silent)
         self.sections.update(t, dt, level, high, onset, beats, bpm, silent)
-        self.intensity.update(t, dt, rms, onset, beats, bpm, silent)
+        self.intensity.update(t, dt, rms, onset, beats, bpm, silent, high_raw)
         if t >= self._next_classify:
             self._next_classify = t + 1.0
             f = self.profile.features(bpm)
