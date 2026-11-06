@@ -339,6 +339,9 @@ class IntensityTracker:
             self._silent_t = t
             self._set(1, t)
             self._tension = None                           # ticho medzi skladbami nie je breakdown
+            self.short, self.hs, self.hl = None, 0.0, 0.0   # ďalšia skladba: učiť sa odznova
+            self.hist.clear()
+            self._t0 = t
             self.heat = 0.0
             return self.level
         if t - self._t0 < self.LEARN_S or len(self.hist) < 20:
