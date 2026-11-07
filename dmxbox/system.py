@@ -205,11 +205,18 @@ def bt_status() -> dict:
         st["discoverable"] = "Discoverable: yes" in show
         m = re.search(r"Alias:\s*(.+)", show)
         st["name"] = m.group(1).strip() if m else None
-        connected = {mac for mac, _ in _bt_devices("Connected")}
-        for mac, name in _bt_devices("Paired"):
+        conn = _bt_devices("Connected")
+        connected = {mac for mac, _ in conn}
+        # spárované + pripojené: mobil, ktorý sa pripojil bez trvalého spárovania (bonding),
+        # v „Paired“ nie je – inak by ho appka nevidela, hoci hrá
+        seen: dict[str, str] = dict(_bt_devices("Paired"))
+        for mac, name in conn:
+            seen.setdefault(mac, name)
+        for mac, name in seen.items():
             icon = _bt_icon(mac)
             st["devices"].append({"mac": mac, "name": name, "connected": mac in connected,
-                                  "speaker": icon.startswith("audio")})
+                                  "speaker": icon.startswith("audio"),
+                                  "icon": icon})
     except CmdError as e:
         st["error"] = str(e)
     return st

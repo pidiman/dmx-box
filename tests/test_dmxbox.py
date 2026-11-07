@@ -1314,3 +1314,21 @@ def test_intensity_dj_set_buildup_peaks_without_kick():
     assert first4 <= 109                                   # do ~2 s po návrate
     between = [l for tt, l in levels if 96 <= tt < first4]
     assert 2 not in between                                # nie pád na groove počas stúpania
+
+
+def test_bt_status_lists_connected_unpaired_phone(monkeypatch):
+    """Mobil pripojený bez trvalého spárovania musí byť v zozname (krok 1 scenára BT)."""
+    from dmxbox import system as sysm
+    out = {
+        ("bluetoothctl", "show"): "Controller AA\\n\\tAlias: fajny-dmx-box\\n\\tPowered: yes\\n\\tDiscoverable: yes",
+        ("bluetoothctl", "devices", "Connected"): "Device 11:22:33:44:55:66 Pixel 7",
+        ("bluetoothctl", "devices", "Paired"): "Device F4:4E:FC:33:A4:B0 JBL Flip",
+        ("bluetoothctl", "info", "11:22:33:44:55:66"): "\\tIcon: phone",
+        ("bluetoothctl", "info", "F4:4E:FC:33:A4:B0"): "\\tIcon: audio-card",
+    }
+    monkeypatch.setattr(sysm, "has", lambda c: True)
+    monkeypatch.setattr(sysm, "run", lambda *a, **k: out.get(a, "").replace("\\\\n", "\\n").replace("\\\\t", "\\t"))
+    st = sysm.bt_status()
+    d = {x["mac"]: x for x in st["devices"]}
+    assert d["11:22:33:44:55:66"]["connected"] and not d["11:22:33:44:55:66"]["speaker"]
+    assert d["F4:4E:FC:33:A4:B0"]["speaker"] and not d["F4:4E:FC:33:A4:B0"]["connected"]
