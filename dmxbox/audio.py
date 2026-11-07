@@ -9,6 +9,7 @@ from __future__ import annotations
 import collections
 import math
 import copy
+from collections import deque
 import logging
 import shutil
 import subprocess
@@ -63,7 +64,12 @@ class AudioState:
 
 # --- zdroje -----------------------------------------------------------------
 
+PREFER_MONITOR: str | None = None     # náskok svetiel: analyzuj virtuálny výstup pred oneskorením
+
+
 def default_monitor() -> str:
+    if PREFER_MONITOR:
+        return PREFER_MONITOR
     try:
         sink = subprocess.run(["pactl", "get-default-sink"], capture_output=True,
                               text=True, timeout=3).stdout.strip()
@@ -260,6 +266,8 @@ class Analyzer(threading.Thread):
 
         self.state = AudioState()
         self._lock = threading.Lock()
+        self.lookahead = 0.0                 # s náskoku analýzy pred prehrávaním (AirPlay buffer)
+        self._hist: deque[AudioState] = deque()
         self._halt = threading.Event()
         self._frames = 0
         self._last_onset_t = -1.0
@@ -275,6 +283,19 @@ class Analyzer(threading.Thread):
 
     def snapshot(self) -> AudioState:
         with self._lock:
+            if self.lookahead > 0 and self._hist:
+                target = self.state.t - self.lookahead
+                h = self._hist
+                if h[0].t <= target:                     # posledná snímka nie novšia ako target
+                    lo, hi = 0, len(h) - 1
+                    while lo < hi:
+                        mid = (lo + hi + 1) // 2
+                        if h[mid].t <= target:
+                            lo = mid
+                        else:
+                            hi = mid - 1
+                    return copy.copy(h[lo])
+                return copy.copy(h[0])
             return copy.copy(self.state)
 
     def stop(self) -> None:
@@ -456,6 +477,7 @@ class Analyzer(threading.Thread):
                                  level=vals["level"], high=vals["high"], onset=kick_hit,
                                  onset_strength=strength, silent=silent, rms=rms,
                                  high_raw=float(np.sqrt(energies["high"])))
+        prev_level, prev_peaks = s.intensity, s.peak_count
         with self._lock:
             s.viz_l, s.viz_r = self.viz.l.tolist(), self.viz.r.tolist()
             s.style, s.style_confidence = info.style, info.style_confidence
@@ -465,6 +487,40 @@ class Analyzer(threading.Thread):
             s.features = info.features
             s.intensity, s.heat, s.peak_count = info.intensity, info.heat, info.peak_count
             s.intensity_score = info.intensity_score
+            if self.lookahead > 0:
+                if (s.intensity, s.peak_count) != (prev_level, prev_peaks):
+                    self._backdate(info.intensity_change_t)
+                self._hist.append(copy.copy(s))
+                while self._hist and self._hist[0].t < t - self.lookahead - 1.0:
+                    self._hist.popleft()
+
+    # --- náskok (lookahead): zvuk do reprákov ide o `lookahead` s neskôr ako do analýzy ------
+    def set_lookahead(self, seconds: float) -> None:
+        """Hudba sa prehráva oneskorene (AirPlay buffer): analýza ju počuje skôr a svetlá
+        dostanú stav spred `seconds` – zmeny úrovne sa dajú posunúť na skutočný začiatok."""
+        with self._lock:
+            self.lookahead = max(0.0, min(5.0, float(seconds)))
+            self._hist.clear()
+
+    def _backdate(self, start_t: float) -> None:
+        """Zmena úrovne zistená teraz platí od `start_t` (ešte neprehraté snímky ju dostanú).
+        Začiatok sa zarovná na najbližšiu dobu tesne pred ním – drop začína úderom."""
+        s = self.state
+        if not self._hist:
+            return
+        start_t = max(start_t, s.t - self.lookahead)
+        beat_t = None
+        prev = None
+        for e in self._hist:
+            if prev is not None and e.beat_count != prev.beat_count and start_t - 0.6 <= e.t <= start_t + 0.1:
+                beat_t = e.t
+            prev = e
+        if beat_t is not None:
+            start_t = beat_t
+        for e in self._hist:
+            if e.t >= start_t:
+                e.intensity, e.heat, e.peak_count = s.intensity, s.heat, s.peak_count
+                e.intensity_score = s.intensity_score
 
     def _estimate_tempo(self) -> None:
         if self._override_bpm is not None or len(self.flux_hist) < self.frame_rate * 4:

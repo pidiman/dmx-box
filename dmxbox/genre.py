@@ -304,6 +304,8 @@ class IntensityTracker:
         self._silent_t = -1e9
         self._tension: float | None = None              # od kedy trvá pokoj/rozohrievanie
         self._tension_min = 0.0                          # najtichšie miesto napätia (dB)
+        self._rise_t: float | None = None                # kedy začala stúpať energia po napätí
+        self.change_t = 0.0                              # odhad, kedy sa úroveň v hudbe naozaj zmenila
 
     def reset(self, t: float) -> None:
         """Nová skladba (zmena v AirPlay/BT): hlasitosť skladieb sa líši o niekoľko dB,
@@ -377,6 +379,11 @@ class IntensityTracker:
         tension_long = self._tension is not None and t - self._tension >= 4.0
         if cur in (1, 3) and self._tension is not None:
             self._tension_min = min(self._tension_min, self.short)
+            if self.fast >= self._tension_min + 2.0:
+                if self._rise_t is None:
+                    self._rise_t = t
+            elif self.fast < self._tension_min + 1.0:
+                self._rise_t = None
         # návrat energie po pokoji/rozohrievaní = drop: energia späť medzi hlasné časti a aspoň 5 dB nad
         # minimom napätia (s kickom stačí 3 dB). Kick sa nevyžaduje – pri živých setoch ho detekcia často nevidí.
         comeback = (cur in (1, 3) and tension_long and t - self._silent_t > 15.0
@@ -389,6 +396,8 @@ class IntensityTracker:
             self._peak_t = t
             self._peak_until = beats + self.PEAK_BEATS
             self._set(4, t)
+            if self._rise_t is not None and t - self._rise_t < 3.0:
+                self.change_t = self._rise_t                   # drop začal, keď energia vyskočila
             return self._heat(4, dt)
         if not held:
             return self._heat(cur, dt)
@@ -418,6 +427,8 @@ class IntensityTracker:
             elif lvl in (2, 4):
                 self._tension = None
             self.level, self._since = lvl, t
+            self.change_t = t - 1.0                            # vyhladzovanie mešká ~1 s
+            self._rise_t = None if lvl in (2, 4) else self._rise_t
             if lvl == 3:
                 self.heat = 0.0
 
@@ -444,6 +455,7 @@ class MusicInfo:
     heat: float = 0.0
     peak_count: int = 0
     intensity_score: float = 0.5
+    intensity_change_t: float = 0.0
 
 
 class MusicAnalyzer:
@@ -479,4 +491,5 @@ class MusicAnalyzer:
         it = self.intensity
         self.info.intensity, self.info.heat, self.info.peak_count = it.level, round(it.heat, 3), it.peak_count
         self.info.intensity_score = round(it.score, 3)
+        self.info.intensity_change_t = it.change_t
         return self.info

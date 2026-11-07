@@ -326,3 +326,5 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .lvl[data-l="3"] i:nth-child(-n+3) { background: #ffc65a; }
 .lvl[data-l="4"] i { background: #ff2d6f; box-shadow: 0 0 8px #ff2d6f88; }
 .lvl[hidden] { display: none; }
+
+#air-delay { background: #1d1d2c; color: var(--text); border: 1px solid #2e2e44; border-radius: 8px; padding: 4px 6px; font: 600 13px system-ui, sans-serif; }

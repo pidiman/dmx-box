@@ -87,7 +87,15 @@ def build(cfg: dict, sim_bpm: float | None = None, dry: bool = False,
                ScenarioStore(resolve(cfg.get("scenario_file", "scenario.json"))),
                Auth(resolve(cfg.get("security_file", "security.json"))), NowPlaying(), rig_store,
                SpeakerWatch(resolve(cfg.get("speaker_file", "speaker.json"))),
-               AirplayKeep(resolve(cfg.get("airplay_file", "airplay.json"))))
+               AirplayKeep(resolve(cfg.get("airplay_file", "airplay.json")),
+                           on_delay=lambda sec, mon: _set_lookahead(analyzer, sec, mon)))
+
+
+def _set_lookahead(analyzer, seconds: float, monitor: str | None) -> None:
+    """Náskok svetiel: analýza počúva zvuk pred oneskorením a svetlá berú stav spred `seconds`."""
+    from . import audio as audio_mod
+    audio_mod.PREFER_MONITOR = monitor           # parec_source("auto") sa do 2 s prepne
+    analyzer.set_lookahead(seconds)
 
 
 def _track_watch(box) -> None:
@@ -140,6 +148,9 @@ def main() -> None:
     if box.speaker:
         box.speaker.start()
     if box.airkeep:
+        last = box.scenarios.last or {}
+        box.airkeep.airplay_scenario = last.get("id") == "airplay" or (
+            last.get("id") == "btspeaker" and last.get("source", "airplay") == "airplay")
         box.airkeep.start()
     box.player.start()
     box.slog.start()

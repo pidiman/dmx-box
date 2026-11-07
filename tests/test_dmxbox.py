@@ -1332,3 +1332,59 @@ def test_bt_status_lists_connected_unpaired_phone(monkeypatch):
     d = {x["mac"]: x for x in st["devices"]}
     assert d["11:22:33:44:55:66"]["connected"] and not d["11:22:33:44:55:66"]["speaker"]
     assert d["F4:4E:FC:33:A4:B0"]["speaker"] and not d["F4:4E:FC:33:A4:B0"]["connected"]
+
+
+def test_airplay_delay_lookahead(tmp_path, monkeypatch):
+    """Náskok svetiel: v AirPlay scenári pw-loopback --delay namiesto module-loopback,
+    analýza dostane monitor virtuálneho výstupu a náskok; mimo AirPlay späť bez oneskorenia."""
+    import subprocess as sp
+    from dmxbox import airplay_keep as ak
+    started, killed = [], []
+
+    class P:
+        def __init__(self, cmd, **kw):
+            started.append(cmd)
+        def poll(self):
+            return None
+        def terminate(self):
+            killed.append(1)
+        def wait(self, timeout=None):
+            return 0
+    monkeypatch.setattr(ak.subprocess, "Popen", P)
+    monkeypatch.setattr(ak.subprocess, "run", lambda *a, **k: sp.CompletedProcess(a, 0, "  -d, --delay  delay", ""))
+    pw = _FakePW()
+    seen = []
+    k = ak.AirplayKeep(tmp_path / "airplay.json", sysmod=pw, dropin=tmp_path / "d.conf",
+                       on_delay=lambda sec, mon: seen.append((sec, mon)))
+    assert k.delay_ms == 2000
+    k.apply()                                            # nie AirPlay scenár → bez oneskorenia
+    assert not started and any("module-loopback" in n for n, _ in pw.modules.values())
+    k.set_scenario(True)
+    assert started and "--delay" in started[-1] and "2.00" in started[-1]
+    assert not any(n == "module-loopback" for n, _ in pw.modules.values())
+    assert seen[-1] == (2.0, "dmxbox_airplay.monitor") and k.info()["delay_active"] == 2000
+    k.set_delay(1000)
+    assert "1.00" in started[-1] and seen[-1][0] == 1.0
+    k.set_scenario(False)                                # BT scenár → bez oneskorenia
+    assert killed and seen[-1] == (0.0, None)
+    assert any(n == "module-loopback" for n, _ in pw.modules.values())
+    assert ak.AirplayKeep(tmp_path / "airplay.json", sysmod=pw, dropin=tmp_path / "d.conf").delay_ms == 1000
+
+
+def test_lookahead_peak_on_first_beat():
+    """S náskokom 2 s svetlá dostanú vrchol presne pri návrate energie (koniec breakdownu 44 s)."""
+    late, early = None, None
+    for la in (0.0, 2.0):
+        an = Analyzer(iter(()), silence_seconds=2)
+        an.set_lookahead(la)
+        for blk in synth_source(bpm=None, genre="house", seconds=56, breakdown=(30, 44)):
+            an.process(blk)
+            s = an.snapshot()
+            if s.intensity == 4 and s.t > 40:
+                if la:
+                    early = s.t
+                else:
+                    late = s.t
+                break
+    assert early is not None and late is not None
+    assert 43.5 <= early <= 44.4 and early < late

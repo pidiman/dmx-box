@@ -108,6 +108,10 @@ def apply(box, data: dict) -> dict:
         step("AirPlay", system.airplay_set, True)
     if data.get("volume") is not None:
         step("Hlasitosť", system.audio_volume, int(data["volume"]))
+    keep = getattr(box, "airkeep", None)
+    if keep is not None:                 # náskok svetiel platí len pre AirPlay
+        step("Náskok svetiel", keep.set_scenario,
+             sid == "airplay" or (sid == "btspeaker" and source == "airplay"))
 
     delay = int(data.get("delay_ms", 200 if sid == "btspeaker" else 0))
     box.line_in.set(False)          # loopback na nový výstup

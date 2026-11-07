@@ -466,7 +466,27 @@ function airKeepState(k) {
   row.hidden = !(k && k.available);
   if (!row.hidden && !airBusy) $("#air-keep").checked = !!k.keep;
   if (k && k.error) row.title = k.error; else row.removeAttribute("title");
+  const dr = $("#air-delay-row"), lab = $("#air-delay-l");
+  dr.hidden = row.hidden;
+  if (dr.hidden) return;
+  if (!airBusy) $("#air-delay").value = String(k.delay_ms ?? 0);
+  let st = "";
+  if (k.delay_supported === false) st = " · PipeWire to nevie";
+  else if (k.delay_ms && !k.keep) st = " · zapni „AirPlay hrá pri výpadku“";
+  else if (k.delay_ms && !k.airplay_scenario) st = " · len v scenári AirPlay";
+  else if (k.delay_active) st = " · beží";
+  lab.textContent = "Náskok svetiel (AirPlay)" + st;
 }
+$("#air-delay").addEventListener("change", async (ev) => {
+  airBusy = true;
+  try {
+    const r = await fetch("/api/system/airplay/delay", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ms: Number(ev.target.value) }) });
+    if (!r.ok) throw new Error();
+    toast(Number(ev.target.value) ? `Hudba z AirPlay pôjde o ${ev.target.value / 1000} s neskôr – svetlá vidia dopredu` : "Náskok svetiel vypnutý");
+  } catch { toast("Nepodarilo sa uložiť"); }
+  airBusy = false;
+});
 $("#air-keep").addEventListener("change", async (ev) => {
   airBusy = true;
   try {

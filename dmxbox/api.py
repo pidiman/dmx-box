@@ -557,6 +557,18 @@ def create_app(box) -> FastAPI:
             raise HTTPException(400, "AirPlay nie je dostupný")
         return {"ok": True, "result": box.airkeep.set_keep(body.on)}
 
+    class DelayBody(BaseModel):
+        ms: int
+
+    @app.post("/api/system/airplay/delay")
+    def airplay_delay(body: DelayBody):
+        """Náskok svetiel: hudba z AirPlay zaznie o ms neskôr, svetlá vidia dopredu."""
+        if not getattr(box, "airkeep", None):
+            raise HTTPException(400, "AirPlay nie je dostupný")
+        if body.ms not in box.airkeep.DELAYS:
+            raise HTTPException(400, "ms: 0 | 1000 | 2000 | 3000")
+        return {"ok": True, "result": box.airkeep.set_delay(body.ms)}
+
     @app.post("/api/system/spotify")
     def spotify(body: OnBody):
         return _cmd(system.spotify_set, body.on)
