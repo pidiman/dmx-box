@@ -36,6 +36,10 @@ class MuteBody(BaseModel):
     on: bool
 
 
+class DelayBody(BaseModel):
+    ms: int
+
+
 class FxBody(BaseModel):
     wheel: int
     fx: str
@@ -556,9 +560,6 @@ def create_app(box) -> FastAPI:
         if not getattr(box, "airkeep", None):
             raise HTTPException(400, "AirPlay nie je dostupný")
         return {"ok": True, "result": box.airkeep.set_keep(body.on)}
-
-    class DelayBody(BaseModel):
-        ms: int
 
     @app.post("/api/system/airplay/delay")
     def airplay_delay(body: DelayBody):

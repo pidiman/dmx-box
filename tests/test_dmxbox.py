@@ -772,7 +772,7 @@ def test_bt_speaker_stall_and_half_connection(tmp_path, monkeypatch):
     fake.calls.clear(); w.tick()                       # vyriešené
     assert not any(c[:2] == ("bluetoothctl", "disconnect") for c in fake.calls)
     # polovičné spojenie: Connected: yes, ale žiadny zvukový výstup dlhšie ako HALF_S
-    w.CYCLE_MIN_S = 60; w._last_fix = 0.0; w.HALF_S = 0
+    w.CYCLE_MIN_S = 60; w._last_fix = -1e9; w.HALF_S = 0
     orig = fake.audio_status
     fake.audio_status = lambda: {"sinks": [{"name": "alsa_output.jack"}]}
     w.tick(); w.tick()
@@ -1388,3 +1388,18 @@ def test_lookahead_peak_on_first_beat():
                 break
     assert early is not None and late is not None
     assert 43.5 <= early <= 44.4 and early < late
+
+
+def test_api_airplay_delay(tmp_path):
+    from fastapi.testclient import TestClient
+    from dmxbox.api import create_app
+    from dmxbox.airplay_keep import AirplayKeep
+    box = _box(tmp_path)
+    pw = _FakePW()
+    box.airkeep = AirplayKeep(tmp_path / "airplay.json", sysmod=pw, dropin=tmp_path / "d.conf")
+    box.airkeep.live["delay_supported"] = False
+    c = TestClient(create_app(box))
+    r = c.post("/api/system/airplay/delay", json={"ms": 1000})
+    assert r.status_code == 200, r.text
+    assert r.json()["result"]["delay_ms"] == 1000
+    assert c.post("/api/system/airplay/delay", json={"ms": 1500}).status_code == 400
