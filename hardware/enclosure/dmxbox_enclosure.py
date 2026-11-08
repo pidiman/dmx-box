@@ -1,6 +1,7 @@
 """DMX box – krabička pre 3D tlač (Blender / bpy).
 
 Raspberry Pi 3B+ (predvolené) alebo Pi 4 (--pi4: iné porty), MAX485 modul vnútri na GPIO,
+displej 2,2" TFT ILI9341 a rotačný enkóder s tlačidlom vo veku,
 panelová XLR samica (D-typ, napr. Neutrik NC3FD-L-1) na ľavej stene, porty Pi vyvedené.
 
 Spustenie:  python3 dmxbox_enclosure.py [--pi4] [--no-render]   (pip install bpy)   → STL + náhľady do ./out
@@ -19,7 +20,7 @@ os.makedirs(OUT, exist_ok=True)
 
 # --- rozmery --------------------------------------------------------------------------------
 T = 2.4              # stena / dno / veko
-L, W, H = 128.0, 60.0, 34.0     # vnútro
+L, W, H = 128.0, 60.0, 40.0     # vnútro (40: pod displejom sa zmestí telo XLR)
 LID = 2.4
 CLR = 0.3            # vôľa veka
 PI_X0, PI_Y0 = 42.0, 2.0        # ľavý-predný roh dosky Pi vo vnútri krabičky
@@ -33,6 +34,15 @@ FRONT = ([(11.2, 10.5, 4.5), (26.0, 8.5, 4.5), (39.5, 8.5, 4.5)] if PI4      # U
 RIGHT = ([(9.0, 16.0, 17.0), (27.0, 16.0, 17.0), (45.75, 17.0, 14.5)] if PI4  # USB2, USB3, Ethernet
          else [(10.25, 17.0, 14.5), (29.0, 16.0, 17.0), (47.0, 16.0, 17.0)])  # Ethernet, USB, USB
 SUFFIX = "_pi4" if PI4 else "_pi3"
+
+# displej 2,2" 240×320 ILI9341 SPI (MSP2202): doska 67,2 × 40,1 mm, aktívna plocha 45,12 × 33,84 mm.
+# Otvory dosky nie sú v dokumentácii – DISP_HOLE je typická vzdialenosť od rohu, over na module.
+DISP_PCB = (67.2, 40.1)
+DISP_ACTIVE = (45.12, 33.84)
+DISP_X0, DISP_YC = 8.0, 30.0          # ľavý okraj dosky a stred v y (vo vnútri krabice)
+DISP_GLASS = 2.6                       # sklo + rám displeja nad doskou (výška stĺpikov)
+DISP_HOLE = 2.6
+ENC_XY = (116.0, 30.0)                 # rotačný enkóder (závit ~7 mm)
 
 
 def pi(x, y):
@@ -87,6 +97,21 @@ def boolean(target, tools, op):
         bpy.ops.object.modifier_apply(modifier=m.name)
         bpy.data.objects.remove(t, do_unlink=True)
     return target
+
+
+def frustum(name, cx, cy, z0, z1, hx, hy, grow):
+    """Zrezaný ihlan (skosenie okna): spodok hx × hy, vrch o `grow` väčší na každú stranu."""
+    vs = []
+    for z, g in ((z0, 0.0), (z1, grow)):
+        for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            vs.append((cx + sx * (hx + g), cy + sy * (hy + g), z))
+    faces = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(vs, [], faces)
+    me.update()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o
 
 
 def text(name, body, size, x, y, z, depth, rot=(0, 0, 0), align="CENTER"):
@@ -147,12 +172,12 @@ def build_case():
     adds.append(box("rail_b", 38.6, 14, -0.5, 40.2, 46, 4.0))
     # rohové stĺpiky pre veko (M3 samorezná), zospodu kužeľ 45° – tlač bez podpier
     for cx, cy in ((3.5, 3.5), (L - 3.5, 3.5), (3.5, W - 3.5), (L - 3.5, W - 3.5)):
-        adds.append(cyl(f"boss_{cx}_{cy}", cx, cy, 27.0, H, 3.6))
-        adds.append(cyl(f"cone_{cx}_{cy}", cx, cy, 23.4, 27.0, 0.01, r2=3.6))
+        adds.append(cyl(f"boss_{cx}_{cy}", cx, cy, H - 7.0, H, 3.6))
+        adds.append(cyl(f"cone_{cx}_{cy}", cx, cy, H - 10.6, H - 7.0, 0.01, r2=3.6))
         # spojka do rohu steny, nech stĺpik nevisí len na kúsku
         sx0, sx1 = (-0.5, cx) if cx < L / 2 else (cx, L + 0.5)
         sy0, sy1 = (-0.5, cy) if cy < W / 2 else (cy, W + 0.5)
-        adds.append(box(f"web_{cx}_{cy}", sx0, sy0, 27.0, sx1, sy1, H))
+        adds.append(box(f"web_{cx}_{cy}", sx0, sy0, H - 7.0, sx1, sy1, H))
     boolean(outer, adds, "UNION")
 
     holes = []
@@ -181,13 +206,43 @@ def build_lid():
     for cx, cy in ((3.5, 3.5), (L - 3.5, 3.5), (3.5, W - 3.5), (L - 3.5, W - 3.5)):
         cuts.append(cyl(f"lh_{cx}", cx, cy, H - 1, H + LID + 1, 1.7, verts=32))
         cuts.append(cyl(f"lcs_{cx}", cx, cy, H + LID - 1.6, H + LID + 0.01, 1.7, r2=3.2, verts=32))
-    # vetranie nad Pi (CPU je pod stredom dosky)
-    for i in range(9):
-        x = 58 + i * 6.5
+    # vetranie nad Pi (medzi displejom a gombíkom)
+    for i in range(4):
+        x = 83 + i * 6.0
         cuts.append(box(f"lv_{i}", x, 14, H - 1, x + 2.6, 46, H + LID + 1))
-    # nápis
-    cuts.append(text("logo", "fajny DMX box", 5.2, 24.0, W / 2, H + LID - 0.3, 1.2))
+    # okno displeja: aktívna plocha + 0,8 mm, zhora skosené 45°
+    pw, ph = DISP_PCB
+    aw, ah = DISP_ACTIVE
+    dcx = DISP_X0 + pw / 2
+    wx, wy = aw / 2 + 0.8, ah / 2 + 0.8
+    cuts.append(box("disp_win", dcx - wx, DISP_YC - wy, H - 5, dcx + wx, DISP_YC + wy, H + LID + 1))
+    bev = frustum("disp_bevel", dcx, DISP_YC, H + LID - 1.2, H + LID + 0.01, wx, wy, 1.2)
+    cuts.append(bev)
+    # gombík
+    cuts.append(cyl("enc_hole", ENC_XY[0], ENC_XY[1], H - 1, H + LID + 1, 3.7, verts=48))
+    # nápisy
+    cuts.append(text("logo", "fajny DMX box", 4.2, 108.0, 8.0, H + LID - 0.3, 1.2))
+    cuts.append(text("enc_lbl", "PUSH", 2.8, ENC_XY[0], ENC_XY[1] + 9.5, H + LID - 0.3, 1.2))
     boolean(lid, cuts, "DIFFERENCE")
+
+    # pod vekom: rámik okolo dosky displeja + 4 stĺpiky na skrutky M2 (doska visí zo skla)
+    adds = []
+    x0, x1 = DISP_X0 - 0.3, DISP_X0 + pw + 0.3
+    y0, y1 = DISP_YC - ph / 2 - 0.3, DISP_YC + ph / 2 + 0.3
+    fh = DISP_GLASS + 1.6 + 1.0
+    for nm, a, b, c, d in (("fr_f", x0 - 1.2, y0 - 1.2, x1 + 1.2, y0),
+                           ("fr_b", x0 - 1.2, y1, x1 + 1.2, y1 + 1.2),
+                           ("fr_l", x0 - 1.2, y0, x0, y1)):          # pravá strana voľná: pin header
+        adds.append(box(nm, a, b, H - fh, c, d, H + 0.1))
+    for hx in (DISP_X0 + DISP_HOLE, DISP_X0 + pw - DISP_HOLE):
+        for hy in (DISP_YC - ph / 2 + DISP_HOLE, DISP_YC + ph / 2 - DISP_HOLE):
+            adds.append(cyl(f"dpost_{hx}_{hy}", hx, hy, H - DISP_GLASS, H + 0.1, 2.3, verts=32))
+    boolean(lid, adds, "UNION")
+    holes = []
+    for hx in (DISP_X0 + DISP_HOLE, DISP_X0 + pw - DISP_HOLE):
+        for hy in (DISP_YC - ph / 2 + DISP_HOLE, DISP_YC + ph / 2 - DISP_HOLE):
+            holes.append(cyl(f"dph_{hx}_{hy}", hx, hy, H - DISP_GLASS - 1, H - 0.4, 0.8, verts=20))
+    boolean(lid, holes, "DIFFERENCE")
     return lid
 
 
@@ -257,12 +312,32 @@ def main():
     material(lid, (0.85, 0.12, 0.38))
     if "--no-render" in sys.argv:
         return
+    # len do náhľadu: displej a gombík vo veku
+    pw, ph = DISP_PCB
+    dcx = DISP_X0 + pw / 2
+    glass = box("glass", dcx - DISP_ACTIVE[0] / 2 - 1, DISP_YC - DISP_ACTIVE[1] / 2 - 1, H - DISP_GLASS,
+                dcx + DISP_ACTIVE[0] / 2 + 1, DISP_YC + DISP_ACTIVE[1] / 2 + 1, H + 0.6)
+    material(glass, (0.02, 0.15, 0.35))
+    knob = cyl("knob", ENC_XY[0], ENC_XY[1], H + LID, H + LID + 14, 7.5, verts=48)
+    material(knob, (0.12, 0.12, 0.14))
+    for o in (glass, knob):
+        o.parent = lid
     lid.location.z += 40                      # rozložený pohľad
     c = (L / 2, W / 2, 20)
     render(os.path.join(OUT, f"preview_front{SUFFIX}.png"), (-90, -150, 140), c)
     render(os.path.join(OUT, f"preview_back{SUFFIX}.png"), (230, 210, 120), c)
-    lid.hide_render = True
+    render(os.path.join(OUT, f"preview_top{SUFFIX}.png"), (L / 2, W / 2 - 60, 230), (L / 2, W / 2, 40))
+    for o in (lid, glass, knob):
+        o.hide_render = True
     render(os.path.join(OUT, f"preview_inside{SUFFIX}.png"), (L / 2, -40, 190), (L / 2, W / 2, 0))
+    # spodok veka: rámik a stĺpiky displeja
+    for o in (lid, glass, knob):
+        o.hide_render = o is not lid
+    case.hide_render = True
+    lid.location.z -= 40
+    lid.rotation_euler = (math.radians(180), 0, 0)
+    lid.location = (0, W, 2 * H + LID)
+    render(os.path.join(OUT, f"preview_lid_under{SUFFIX}.png"), (L / 2, -60, H + 150), (L / 2, W / 2, H))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"dmxbox_enclosure{SUFFIX}.blend"))
 
 
